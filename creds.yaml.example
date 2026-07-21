@@ -1,0 +1,11 @@
+# Kopieer naar creds.yaml (gitignored). Wordt ook gevonden in
+# ~/github_repos/fo_doc_gen/creds.yaml — dan hoef je niets te dupliceren.
+jira:
+  base_url: "https://jira.vitens.lan"   # /jira-contextpad wordt automatisch gevonden
+  api_token: "<Data Center Personal Access Token>"   # Bearer, geen Basic auth
+testrail:
+  base_url: "https://testrail.vitens.lan"
+  project_id: 58
+  email: "naam@vitens.nl"
+  api_key: "<TestRail API key>"
+  verify_ssl: false

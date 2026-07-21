@@ -1,0 +1,6 @@
+creds.yaml
+output/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
