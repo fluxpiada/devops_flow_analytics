@@ -1,0 +1,503 @@
+{
+  "generated": "2026-07-21T10:28:46",
+  "jira_lifecycle": {
+    "key": "S34-2908",
+    "summary": "SIMPEL: W030 Nog niet oprollen",
+    "issuetype": "Story",
+    "epic": null,
+    "status": "Resolved",
+    "created": "2025-03-31T12:59:09.283+0200",
+    "updated": "2026-03-16T10:27:27.742+0100",
+    "resolutiondate": "2025-12-18T10:19:00.235+0100",
+    "story_points": null,
+    "sprint_changes": 2,
+    "impediment_flags": 1,
+    "transitions": [
+      {
+        "ts": "2025-03-31T13:22:47.248+0200",
+        "author": "Buijtenhuis, Jan",
+        "from": "New",
+        "to": "To Do"
+      },
+      {
+        "ts": "2025-11-19T10:05:13.110+0100",
+        "author": "Westerbeek, Bart",
+        "from": "To Do",
+        "to": "In Progress"
+      },
+      {
+        "ts": "2025-12-11T14:40:14.454+0100",
+        "author": "Westerbeek, Bart",
+        "from": "In Progress",
+        "to": "In testing"
+      },
+      {
+        "ts": "2025-12-18T10:19:00.239+0100",
+        "author": "Westerbeek, Bart",
+        "from": "In testing",
+        "to": "Resolved"
+      }
+    ],
+    "time_in_status_days": {
+      "New": 0.0,
+      "To Do": 232.9,
+      "In Progress": 22.2,
+      "In testing": 6.8
+    },
+    "subtasks": [],
+    "issuelinks": [
+      {
+        "relation": "relates to",
+        "key": "ITS-294576",
+        "issuetype": "Change"
+      },
+      {
+        "relation": "relates to",
+        "key": "ITS-304898",
+        "issuetype": "Change"
+      }
+    ]
+  },
+  "testrail_run": {
+    "run_id": 26119,
+    "name": "S34-2908 SIMPEL: W030 Nog niet oprollen",
+    "suite_id": 496,
+    "project_id": 58,
+    "created_on": 1765790034,
+    "completed_on": null,
+    "is_completed": false,
+    "tests": 14,
+    "results": 14,
+    "executions_per_test": {
+      "mean": 1.0,
+      "median": 1,
+      "max": 1
+    },
+    "result_status_spread": {
+      "passed": 14
+    },
+    "first_pass_rate": 1.0,
+    "first_result": "2025-12-15T11:23:34",
+    "last_result": "2025-12-16T16:23:37",
+    "execution_days": 2,
+    "effort_proxy": {
+      "per_tester": {
+        "959": {
+          "results": 14,
+          "active_days": 2,
+          "in_session_gaps": 9,
+          "median_gap_min": 15.9,
+          "net_active_hours": 3.06
+        }
+      },
+      "testers": 1,
+      "pooled_median_gap_min": 15.9,
+      "pooled_mean_gap_min": 20.4,
+      "net_active_hours": 3.06
+    },
+    "w_codes": {
+      "W010": {
+        "tests": 6,
+        "executions": 6,
+        "failed": 0,
+        "defects": []
+      },
+      "W020": {
+        "tests": 3,
+        "executions": 3,
+        "failed": 0,
+        "defects": []
+      },
+      "W040": {
+        "tests": 2,
+        "executions": 2,
+        "failed": 0,
+        "defects": []
+      },
+      "W060": {
+        "tests": 1,
+        "executions": 1,
+        "failed": 0,
+        "defects": []
+      },
+      "W070": {
+        "tests": 1,
+        "executions": 1,
+        "failed": 0,
+        "defects": []
+      },
+      "W080": {
+        "tests": 1,
+        "executions": 1,
+        "failed": 0,
+        "defects": []
+      },
+      "W090": {
+        "tests": 1,
+        "executions": 1,
+        "failed": 0,
+        "defects": []
+      },
+      "W100": {
+        "tests": 13,
+        "executions": 13,
+        "failed": 0,
+        "defects": []
+      }
+    },
+    "defects": [],
+    "defect_resolution_days": {
+      "count": 0,
+      "mean": null,
+      "median": null
+    }
+  },
+  "corpus": null,
+  "roi_model": {
+    "assumptions": {
+      "minutes_per_execution_anchor": 15.9,
+      "minutes_bands": {
+        "low": 11.9,
+        "mid": 23.9,
+        "high": 31.8
+      },
+      "reexecution_factor": 1.0,
+      "build_hours_per_case_bands": [
+        2,
+        4,
+        8
+      ],
+      "maintenance_pct_of_build_per_year": 0.2,
+      "automation_residual_effort": 0.1,
+      "note": "Anchor = pooled median in-session gap between result submissions (lower bound: misses setup/analysis). Bands are sensitivity, not measurements. Confirm all inputs with Key Users."
+    },
+    "annual_executions_by_scope": {},
+    "automatable_cases": 14,
+    "scenarios": [],
+    "target_cadence_scenarios": [
+      {
+        "cadence": "wekelijks",
+        "runs_per_year": 52,
+        "effort_band": "low",
+        "minutes_per_execution": 11.9,
+        "annual_manual_hours": 144,
+        "build_hours_total": 56,
+        "annual_net_saving_hours": 119,
+        "payback_years": 0.5
+      },
+      {
+        "cadence": "wekelijks",
+        "runs_per_year": 52,
+        "effort_band": "mid",
+        "minutes_per_execution": 23.9,
+        "annual_manual_hours": 290,
+        "build_hours_total": 56,
+        "annual_net_saving_hours": 250,
+        "payback_years": 0.2
+      },
+      {
+        "cadence": "wekelijks",
+        "runs_per_year": 52,
+        "effort_band": "high",
+        "minutes_per_execution": 31.8,
+        "annual_manual_hours": 386,
+        "build_hours_total": 56,
+        "annual_net_saving_hours": 336,
+        "payback_years": 0.2
+      },
+      {
+        "cadence": "per sprint (3 wk)",
+        "runs_per_year": 17,
+        "effort_band": "low",
+        "minutes_per_execution": 11.9,
+        "annual_manual_hours": 47,
+        "build_hours_total": 56,
+        "annual_net_saving_hours": 31,
+        "payback_years": 1.8
+      },
+      {
+        "cadence": "per sprint (3 wk)",
+        "runs_per_year": 17,
+        "effort_band": "mid",
+        "minutes_per_execution": 23.9,
+        "annual_manual_hours": 95,
+        "build_hours_total": 56,
+        "annual_net_saving_hours": 74,
+        "payback_years": 0.8
+      },
+      {
+        "cadence": "per sprint (3 wk)",
+        "runs_per_year": 17,
+        "effort_band": "high",
+        "minutes_per_execution": 31.8,
+        "annual_manual_hours": 126,
+        "build_hours_total": 56,
+        "annual_net_saving_hours": 102,
+        "payback_years": 0.5
+      }
+    ]
+  },
+  "change_pressure": {
+    "jira_projects_scanned": "S34, KFDO",
+    "per_step": {
+      "W010": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 18,
+        "stories": 7,
+        "bugs": 11,
+        "by_year": {
+          "2026": 17,
+          "2025": 1
+        },
+        "examples": [
+          "KFDO-768 (Task): Uitwerken requirement als W010 de vriendelijke reminder word",
+          "KFDO-708 (Epic): FactBV- W010 Toevoegen Contactmoment",
+          "KFDO-706 (Epic): FactBV - Herzien W010 - Herinnering (+4 na vervaldat) ipv vo"
+        ]
+      },
+      "W020": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 4,
+        "stories": 3,
+        "bugs": 1,
+        "by_year": {
+          "2026": 2,
+          "2024": 1,
+          "2023": 1
+        },
+        "examples": [
+          "KFDO-284 (Story): W030: Als de W020 eerder wordt gestuurd dan de W030 sturen i",
+          "KFDO-270 (Story): draft: W020 WIK brief eerder sturen",
+          "S34-2152 (Sub-task): Customizing aanmaanactiviteit in W020"
+        ]
+      },
+      "W040": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 14,
+        "stories": 4,
+        "bugs": 10,
+        "by_year": {
+          "2026": 5,
+          "2025": 1,
+          "2024": 1,
+          "2023": 7
+        },
+        "examples": [
+          "KFDO-1076 (Bug): Verzamelfactuur wil niet door in aanmaanproces naar W040",
+          "KFDO-730 (Epic): Vitens - Aanpassing in W040 (freq. en bedrag aanmaning) en W",
+          "S34-3993 (Story): W040 Livegang activiteiten"
+        ]
+      },
+      "W060": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 3,
+        "stories": 1,
+        "bugs": 2,
+        "by_year": {
+          "2026": 1,
+          "2025": 1,
+          "2023": 1
+        },
+        "examples": [
+          "KFDO-730 (Epic): Vitens - Aanpassing in W040 (freq. en bedrag aanmaning) en W",
+          "S34-3115 (Bug): ISS: Als openstaande posten opgehoogd worden naar W060 dan..",
+          "S34-917 (Bug): BUG: CPI - get_invoice_data_jwt geeft onjuiste waarde voor d"
+        ]
+      },
+      "W070": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 0,
+        "stories": 0,
+        "bugs": 0,
+        "by_year": {},
+        "examples": []
+      },
+      "W080": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 2,
+        "stories": 1,
+        "bugs": 1,
+        "by_year": {
+          "2026": 1,
+          "2023": 1
+        },
+        "examples": [
+          "KFDO-705 (Epic): Evides - W080 Drempelbedrag",
+          "S34-917 (Bug): BUG: CPI - get_invoice_data_jwt geeft onjuiste waarde voor d"
+        ]
+      },
+      "W090": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 2,
+        "stories": 0,
+        "bugs": 2,
+        "by_year": {
+          "2026": 1,
+          "2023": 1
+        },
+        "examples": [
+          "KFDO-1017 (Bug): Voor betaalde aanmaankosten wordt vereffening niet ongedaan ",
+          "S34-1423 (Bug): Aanmanen duurt te lang door controle op W090"
+        ]
+      },
+      "W100": {
+        "cases_in_suite": 0,
+        "in_case_study_run": true,
+        "jira_issues": 15,
+        "stories": 3,
+        "bugs": 12,
+        "by_year": {
+          "2026": 8,
+          "2025": 3,
+          "2023": 4
+        },
+        "examples": [
+          "KFDO-1017 (Bug): Voor betaalde aanmaankosten wordt vereffening niet ongedaan ",
+          "KFDO-916 (Story): K&F - Klanten die overgedragen zijn waarbij door het creeen ",
+          "S34-3970 (Bug): Regressie W010 -> W100 Vitens zakelijk"
+        ]
+      }
+    },
+    "steps_missing_from_case_study_run": [],
+    "non_regression_by_year": {}
+  },
+  "dev_test": {
+    "method": "Kalenderproxy: dagen 'In Progress' (dev) vs 'In testing' (test) uit de Jira-changelog. Geen urenregistratie aanwezig; administratief teruggeboekte statussen (alle transities binnen ~1 uur) zijn gemarkeerd en uitgesloten.",
+    "entries": [
+      {
+        "key": "S34-2908",
+        "issuetype": "Story",
+        "summary": "SIMPEL: W030 Nog niet oprollen",
+        "dev_days_in_progress": 22.2,
+        "test_days_in_testing": 6.8,
+        "calendar_days": 261.9,
+        "ratio_test_vs_dev": 0.31,
+        "status_backfilled": false
+      }
+    ],
+    "epic_key": null,
+    "epic_children": [],
+    "retest_gaps": [],
+    "retest_gap_days": {
+      "count": 0,
+      "mean": null,
+      "median": null
+    },
+    "ratio_summary": {
+      "n_valid": 1,
+      "median_test_vs_dev": 0.31,
+      "mean_test_vs_dev": 0.31,
+      "n_resolved_without_testing_phase": 0
+    }
+  },
+  "value_stream": {
+    "unit": "werkdagen (ma–vr); actief = werk, wacht = stilstand",
+    "fte_factor": 0.8,
+    "scope": "start bouw → story opgeleverd (backlog-wachttijd uitgesloten)",
+    "backlog_wait_days": 168.0,
+    "steps": [
+      {
+        "step": "Bouw (development)",
+        "active_days": 13.6,
+        "wait_days": 3.4,
+        "ca_pct": null,
+        "note": "start bouw → overdracht naar test"
+      },
+      {
+        "step": "Testvoorbereiding",
+        "active_days": 3.0,
+        "wait_days": 0.0,
+        "ca_pct": null,
+        "note": "Key Users + testdata klaarzetten"
+      },
+      {
+        "step": "Testuitvoering",
+        "active_days": 2.0,
+        "wait_days": 0.0,
+        "ca_pct": 100,
+        "note": "14 uitvoeringen door 1 testers"
+      },
+      {
+        "step": "Bugfix + hertest",
+        "active_days": 0.0,
+        "wait_days": 0,
+        "ca_pct": 100,
+        "note": "0 bugs; mediaan None d wachten per bug"
+      },
+      {
+        "step": "Afronding / oplevering",
+        "active_days": 1.0,
+        "wait_days": 3.0,
+        "ca_pct": 100,
+        "note": "laatste test → story Resolved"
+      }
+    ],
+    "totals": {
+      "active_days": 19.6,
+      "wait_days": 6.4,
+      "lead_time_days": 26.0,
+      "flow_efficiency_pct": 75,
+      "rolled_first_pass_pct": 100
+    },
+    "automated_scenario": {
+      "steps": [
+        {
+          "step": "Bouw (development)",
+          "active_days": 13.6,
+          "wait_days": 3.4,
+          "ca_pct": null,
+          "note": "start bouw → overdracht naar test"
+        },
+        {
+          "step": "Testvoorbereiding",
+          "active_days": 3.0,
+          "wait_days": 0.0,
+          "ca_pct": null,
+          "note": "Key Users + testdata klaarzetten"
+        },
+        {
+          "step": "Testuitvoering",
+          "active_days": 1.0,
+          "wait_days": 0.0,
+          "ca_pct": 100,
+          "note": "14 uitvoeringen door 1 testers"
+        },
+        {
+          "step": "Bugfix + hertest",
+          "active_days": 0.0,
+          "wait_days": 1.0,
+          "ca_pct": 100,
+          "note": "0 bugs; mediaan None d wachten per bug"
+        },
+        {
+          "step": "Afronding / oplevering",
+          "active_days": 1.0,
+          "wait_days": 3.0,
+          "ca_pct": 100,
+          "note": "laatste test → story Resolved"
+        }
+      ],
+      "active_days": 18.6,
+      "wait_days": 7.4,
+      "lead_time_days": 26.0,
+      "flow_efficiency_pct": 72
+    }
+  },
+  "timeline_phases": {
+    "prep_days": 26.1,
+    "execution_days": 1.2,
+    "closure_days": 1.7,
+    "calendar_days_in_progress_to_resolved": 29.0,
+    "in_testing_days": 6.8,
+    "net_active_person_hours": 3.06,
+    "testers": 1,
+    "active_vs_calendar_pct": 1.3
+  }
+}

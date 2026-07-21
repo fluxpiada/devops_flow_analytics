@@ -1,0 +1,395 @@
+run_id,date,year,name,tests,tests_executed,regression_tests,regression_executed,is_regression,passed,failed
+28066,2026-07-09,2026,ITS-295530 - K&F - Syncasso verdeelt 1 mutatie in meerdere boekingen bij een debiteur,1,1,0,0,False,1,0
+28059,2026-07-09,2026,KFDO-1024 ZISU_BULK_EA61_PROCESSING - TA bepaling op basis van opnamestatus 'niet gefactureerd' werkt niet 100%,4,4,0,0,False,4,0
+28057,2026-07-08,2026,ITS-305171 - Overdracht EIB Flanderijn - Syncasso,6,6,0,0,False,6,0
+28056,2026-07-08,2026,KFDO-874/KFDO-1018 Wegschrijven meterstanden.,7,7,0,0,False,5,0
+28014,2026-07-07,2026,ITS-314398 - Change - K&F - Segment F280_OPEN_AMOUNT niet staat in  iDoc (Variant Rekeningnummer is toegevoegd),3,3,0,0,False,3,0
+28010,2026-07-06,2026,ISS Betalingsregeling & Totaal Openstaand Bedrag,18,13,0,0,False,10,1
+28001,2026-07-03,2026,KFDO-872 / KFDO-873 EBF deel 2 EA21 + herberekening standen S4,12,12,0,0,False,12,0
+27982,2026-07-01,2026,KDFO-16 EBF correcties versnelling 2,17,17,0,0,False,16,0
+27976,2026-06-30,2026,Test Run 30-6-2026,1,1,0,0,False,1,0
+27937,2026-06-26,2026,KFDO-860 Bol wordt in rekening gebracht terwijl er een een 0 tarief in staat Maand AMR,1,1,0,0,False,1,0
+27919,2026-06-25,2026,ITS-316195 - Change - K&F - Systeem voegt rekeningnummer toe bij klanten terwijl rek. nr. al bekend is,5,5,3,3,True,5,0
+27917,2026-06-25,2026,ITS-315699 - PRETEST - K&F - Klanten die overgedragen zijn waarbij door het creeen van een deelpositie er geen aanmaanhistorie is en geen W100 meer,3,3,0,0,False,2,1
+27899,2026-06-24,2026,ITS-309413 Change - Betalingsregeling/betalingsbelofte wordt niet automatisch verwijderd,1,1,0,0,False,1,0
+27885,2026-06-23,2026,ITS-310293 - Change - uitzoeken waarom 2 contractrekeningen niet verder gaan in het incassoproces,12,12,0,0,False,12,0
+27839,2026-06-19,2026,Change - K&F - Voorrijkosten onterecht opgeboekt,2,2,0,0,False,2,0
+27827,2026-06-18,2026,ITS-315795 - Change - K&F - Tickets in W060 en W080 worden niet gesloten,3,3,0,0,False,3,0
+27816,2026-06-18,2026,"K&F - Change Aanpassing uitvalrouting naar “Betalen en Innen""",1,1,0,0,False,1,0
+27797,2026-06-17,2026,KFDO-103 KF-256 Inzicht in meterstanden buiten Tolerantie per Segment oplossing bouw,2,2,0,0,False,2,0
+27795,2026-06-17,2026,KFDO-16 Analyse/ optie verder automatiseren BOL correctie EBF facturatie,13,13,0,0,False,11,0
+27728,2026-06-15,2026,Verzamelfacturen en individuele facturen gaan onterecht gezamenlijk naar W040,1,1,0,0,False,1,0
+27718,2026-06-12,2026,Change - K&F - Vroegsignalering klanten met 0-bedragen worden aangeleverd,4,4,1,1,True,4,0
+27709,2026-06-11,2026,"KFDO-579 Als Evitens wil ik dat binnen een beperkte bandbreedte zijn termijnbedrag mag wijzigen, zodat...",5,5,0,0,False,5,0
+27373,2026-04-20,2026,KFDO-280 - EIB API - Rapportages testen,8,8,0,0,False,8,0
+27225,2026-04-08,2026,ITS-308435 regressie F301,22,22,0,0,False,15,0
+27170,2026-03-31,2026,ITS-308135 Change - Lekvergoeding; voor validatie geschatte standen moet er alleen naar het huidige contract worden gekeken,3,3,0,0,False,3,0
+27152,2026-03-30,2026,ITS-307964 Change - K&F - Branche niet invullen in de EA16,2,2,0,0,False,2,0
+27128,2026-03-27,2026,ITS-307172 K&F - Change: Uitfaseren SMS in reminderservice,2,2,2,2,True,2,0
+27127,2026-03-27,2026,S34-4067 Bulk voorschotplan herkenning TA + VSP al aanwezig,9,9,4,4,True,9,0
+27067,2026-03-23,2026,S34-3863 Controle type eigenaar,2,2,0,0,False,2,0
+27066,2026-03-23,2026,S34-3862 Ophalen gegevens Kadaster,3,3,0,0,False,3,0
+26999,2026-03-20,2026,S34-4062 Dump EA20 tijdens bulk voorschotplan storneren afrekening,1,1,0,0,False,1,0
+26996,2026-03-19,2026,ITS-293541 Verzamelfactuurnummer tonen op tegenboeking van F300,2,2,0,0,False,2,0
+26995,2026-03-19,2026,S34-4037 SL28,3,3,0,0,False,3,0
+26984,2026-03-19,2026,S34-3507 Uitbreiden endpoint photoanalyzer,1,1,0,0,False,1,0
+26979,2026-03-19,2026,ITS-306188 F204 via C4C mist variabelen,2,2,0,0,False,2,0
+26969,2026-03-17,2026,S34-4030 ZISU_BULK_EA61_PROCESSING gebruikmakende van AL11,1,1,0,0,False,1,0
+26956,2026-03-16,2026,HIP-733 Oauth2 voor Paragon flow,1,1,0,0,False,1,0
+26849,2026-03-11,2026,S34-3994 Kruisjes Rapportage,1,1,0,0,False,1,0
+26836,2026-03-09,2026,ITS-300856 Change - 108 vreemde berichten ontvangen door Flanderijn,1,1,0,0,False,1,0
+26834,2026-03-09,2026,KF-260 Aanpassing werking operand Aantal wooneenheden (WFAWVRU01),18,18,4,4,True,17,0
+26832,2026-03-09,2026,S34-3463 / S34-3464 ISS Betaalde kosten en W100,6,6,0,0,False,6,0
+26810,2026-03-04,2026,S34-3973 Versnellen DPC correctie uitval,2,2,0,0,False,2,0
+26785,2026-03-03,2026,Hertest S34-3546,1,1,0,0,False,1,0
+26756,2026-02-25,2026,S34-3950 Output aangepast versie van programma Z_GET_CONTR_GEEN_WERKEL_STAND,1,1,0,0,False,1,0
+26732,2026-02-23,2026,ISS-6166 Activeren configuratie voor CDN support,1,1,0,0,False,1,0
+26693,2026-02-19,2026,S34-3837 Handmatige correctie deel 3,3,3,0,0,False,3,0
+26681,2026-02-18,2026,S34-3600 layouty niet mooi.,1,1,0,0,False,1,0
+26680,2026-02-18,2026,Test Run 18-2-2026,3,3,0,0,False,3,0
+26675,2026-02-17,2026,ITS-302488 Change - K&F - Bezoektickets worden niet gesloten bij een vereffening van een inkomende betaling,4,4,0,0,False,4,0
+26672,2026-02-17,2026,"S34-3430 (ISS) Als VZK wil ik niet relevante functionaliteit niet zien, omdat ...",2,2,0,0,False,2,0
+26671,2026-02-17,2026,"S34-3429 (ISS) Als verzamelklant wil ik toegang krijgen tot ISS, zodat...",4,4,1,1,True,4,0
+26651,2026-02-17,2026,S34-3856 Maken LSMW/ programma om massaal voorschotplannen aan te maken,16,16,0,0,False,15,0
+26645,2026-02-16,2026,ITS-301639 Records in de TOA01 zonder voorloopnullen voor object MTRREADDOC worden niet getoond in S4,5,5,1,1,True,5,0
+26644,2026-02-16,2026,ITS-302722 Change - K&F - Link tickets sluiten werkt niet (correctie gemiste PA),1,1,0,0,False,1,0
+26540,2026-02-03,2026,Test Run 3-2-2026,1,1,0,0,False,0,0
+26507,2026-01-30,2026,ITS-300362 Change - Tickets correctie BoL verplaatsen naar nieuw filter (C4C) (BoL correcties),3,3,0,0,False,3,0
+26505,2026-01-29,2026,S34-3546 Hersteltransport,1,1,1,1,True,1,0
+26491,2026-01-28,2026,S34-3549 Bol correcties weergave aantal bol eenheden op de factuur,1,1,0,0,False,1,0
+26485,2026-01-28,2026,S34-3594 Toevoegen variabelen aan F301 en F304 voor DPC,2,2,0,0,False,2,0
+26472,2026-01-27,2026,S34-3697 / S34-3720 BOL Nazorg,7,7,0,0,False,7,0
+26442,2026-01-26,2026,S34-2907 SIMPEL: W040 De business logica op grensbedrag en niet actieve klant,35,35,19,19,True,35,0
+26383,2026-01-21,2026,ITS-290274 Change - KF-258 Vastrecht Evides ; aantal eenheden corrigeren obv achterstallig onderhoud/onjuiste data,1,1,0,0,False,1,0
+26376,2026-01-20,2026,S34-3640 Z_GET_CONTR_GEEN_WERKEL_STAND,1,1,0,0,False,1,0
+26364,2026-01-19,2026,ITS-291696 Change - K&F - Automatisch toevoegen rek. nr. heeft een vreemde logging,10,10,1,1,True,10,0
+26340,2026-01-16,2026,S34-3531 (OSS ticket) Conversie afgerekende schattingen leidt tot wijziging opnamestatus 7 naar 1,1,1,0,0,False,1,0
+26337,2026-01-15,2026,S34-3641 In massa verwerken tickets met aanhouding IH en standen 05 (MI),1,1,0,0,False,1,0
+26307,2026-01-14,2026,S34-3646 - Afrekenbaar ticket afhandelen na meterwissel met uitbouw lager dan voorgaande schatting,2,2,0,0,False,2,0
+26305,2026-01-14,2026,ITS-297621 C4C ticket afsluiten bij klantbeoordeling,1,1,0,0,False,1,0
+26286,2026-01-13,2026,S34-3637 Medewerker kan taak correctie niet sluiten,1,1,0,0,False,1,0
+26285,2026-01-13,2026,S34--3645  Medewerker kan taak correctie niet sluiten 2,1,1,0,0,False,1,0
+26283,2026-01-12,2026,S34-3603,5,5,0,0,False,4,0
+26273,2026-01-12,2026,Automatische routering e-mails naar N&L,9,9,0,0,False,9,0
+26262,2026-01-08,2026,S34-3639 DPC controle en aanmaken tickets wordt te vroeg in afrekenproces uitgevoerd,4,4,0,0,False,4,0
+26260,2026-01-08,2026,S34-2813 BOL correctie AMR - factuur moet de bol correctie herkenbaar inzichtelijk maken,1,1,0,0,False,1,0
+26227,2026-01-07,2026,S34-3634 Vergeten BRF+ transport importeren en direct corrigeren,1,1,0,0,False,1,0
+26222,2026-01-06,2026,ARC-62,1,1,0,0,False,1,0
+26180,2025-12-24,2025,S34-3558,13,13,0,0,False,13,0
+26119,2025-12-15,2025,S34-2908 SIMPEL: W030 Nog niet oprollen,14,14,6,6,True,14,0
+26107,2025-12-11,2025,S34-3458 Dagelijkse lijst met uitval voor Michel DFKKCOLLEXTH,2,2,0,0,False,2,0
+25746,2025-12-02,2025,S34-3368 Nazorg Go-Live: Scenario's aanpassen zie bijgevoegd in matrix,23,23,0,0,False,19,0
+25744,2025-12-02,2025,ITS-279034 Verbetervoorstel: Vroegsignaleren bij vervallen betalingsregeling of uitstel van betaling,1,1,0,0,False,1,0
+25743,2025-12-02,2025,ITS-284672 K&F - Vroegsignalering: Aanpassen type veld tussenvoegsel (in achternaam) aanlevering BKR/RIS,1,1,0,0,False,1,0
+25678,2025-11-27,2025,S34-3506 FPCI geen bericht laten maken als er geen dossiernummer bekend is,12,12,0,0,False,11,0
+25650,2025-11-25,2025,ITS-292045 Change - K&F - Tickets van de buitendienst worden onterecht naar de binnendienst (rol 6) doorgezet,6,6,0,0,False,6,0
+25598,2025-11-20,2025,S34-3457 MF zonder dossiernummer leidt tot NULL response van Flanderijn,9,0,0,0,False,0,0
+25586,2025-11-19,2025,ITS-291608 ISS aanmeldmogelijkheden SrtVrbrPlt WO en WW,1,1,0,0,False,1,0
+25550,2025-11-17,2025,S34-3352 herberekening vsplan op basis van bestand.,1,1,0,0,False,1,0
+25503,2025-11-12,2025,ITS-289604: Change - K&F - Incassokosten zijn niet zichtbaar bij klantnummer 1011201896,13,13,0,0,False,10,0
+25502,2025-11-12,2025,S34-3508 Opnieuw kunnen verwerken van technisch uitgevallen MF en MK berichten,9,9,0,0,False,9,0
+25498,2025-11-12,2025,S34-3375 Correcte weergave kosten ISS Rekeningen,1,1,0,0,False,1,0
+25456,2025-11-07,2025,S34-2995 Fase 3: BOL-correctie (DPC) nav het ontvangen van een werkelijke stand na een geschatte stand,152,152,0,0,False,116,0
+25447,2025-11-05,2025,Spoedtransport vanwege ontbreken ontdubbelingscontrole in outputmanagement S4 to paragon,1,1,0,0,False,1,0
+25439,2025-11-04,2025,"S34-3131 Go-Live Nazorg: SL11 werkt niet conform verwachting, samenvoegen dossiers",4,4,0,0,False,4,0
+25389,2025-10-30,2025,S34-3195 150 euro controle versie 2,8,8,0,0,False,8,0
+25368,2025-10-30,2025,Regressietest ISS Sitecore Upgrade,191,0,1,0,True,0,0
+25336,2025-10-27,2025,S34-3454 400 ontbrekende TTA betalingen verwerken,2,2,0,0,False,2,0
+25271,2025-10-23,2025,S34-3461 OVstatus 10 en 06 gaat niet naar status 99,9,9,0,0,False,9,0
+25267,2025-10-23,2025,S34-3462 TTA mag geen min betalingen bevatten,3,3,0,0,False,3,0
+25262,2025-10-22,2025,S34-3455 ZFIX_EIB_TTA_REFERENTIE aanpassen nav TTA's met ~001 ~002,1,1,0,0,False,1,0
+25258,2025-10-21,2025,S34-3434 Nette oplossing voor S34-3414 Groovy Script,32,32,0,0,False,29,0
+25248,2025-10-20,2025,S34-3354 Herverwerking uitval EIB,17,17,0,0,False,16,0
+25234,2025-10-15,2025,S34-2906 SIMPEL: W010: de kosteloze digitale reminder versturen,18,18,0,0,False,17,0
+25233,2025-10-15,2025,S34-3453 EIB rapportage sluitredenen,2,2,0,0,False,1,0
+25211,2025-10-13,2025,S34-3451 Geen tickets gemaakt voor te verifiëren betalingen uit TTA van 09.10.2025,1,1,0,0,False,1,0
+25178,2025-10-08,2025,S34-3414 Retry van berichten sturen S4 naar CPI terwijl CPI bericht wel verstuurde naar EIB,1,1,1,1,True,1,0
+25104,2025-10-01,2025,S34-3423 Syncasso TTA kan niet worden ingelezen [2] - Vitens JIRA,25,25,0,0,False,25,0
+25096,2025-09-30,2025,ITS-283159 Records in de TOA01 zonder voorloopnullen,4,4,0,0,False,4,0
+25064,2025-09-29,2025,ITS-285698 Change - K&F - Afsluiten/voltooien EIB tickets - Vitens JIRA,2,2,0,0,False,2,0
+25053,2025-09-25,2025,S34-3411 Uitbreiden Autorisatie,1,1,0,0,False,1,0
+25034,2025-09-24,2025,S34-3390 Bulkverwerking in FP03i niet mogelijk,1,1,1,1,True,1,0
+25021,2025-09-24,2025,S34-3407 Rechtzetten betaling van Flanderijn zonder FVID nummer,3,3,0,0,False,3,0
+24958,2025-09-19,2025,S34-3409 TTA mag niet uitvallen als dossier gesloten of onbekend is,1,1,0,0,False,1,0
+24932,2025-09-16,2025,Inloggen met SMS S34-3342,2,2,0,0,False,2,0
+24931,2025-09-16,2025,S34-3025 Framework aanpassingen tbv BOL correcties,27,27,0,0,False,23,0
+24917,2025-09-16,2025,MK fix Flanderijn,3,2,1,0,True,0,0
+24914,2025-09-15,2025,S34-3387 Bij betaaluitval wordt geen C4C ticket aangemaakt,2,2,0,0,False,2,0
+24913,2025-09-15,2025,"S34-6054 Meternummer verrijkt, geen foto gelogd.",1,1,0,0,False,1,0
+24904,2025-09-12,2025,ITS-284458 KVK Controle uitgevoerd ja/nee wordt onterecht in het aanmeldticket getoond bij een aanmelding via C4C,1,1,0,0,False,1,0
+24896,2025-09-10,2025,ITS-284344 Uitval aanmelden/afmelden bij een zp met foutief kvk,2,2,0,0,False,2,0
+24873,2025-09-09,2025,S34-3384 Uitgevallen TTA moeten ook FVID en V nummer overnemen,7,7,0,0,False,7,0
+24856,2025-09-08,2025,S34-3376 Nazorg Go-Live: Verwerking betaalstapel gaat niet verder na overbetaling,10,10,0,0,False,10,0
+24854,2025-09-05,2025,ITS-283856 Loggen van meerdere bijlagen in 1 idoc gaat niet goed,4,4,0,0,False,4,0
+24838,2025-09-02,2025,GAT Uitbouwen rioolheffing Brummen,7,7,0,0,False,7,0
+24832,2025-09-02,2025,ITS-282880 ISS meterstand wijziging leidt onterecht tot vrijgave implausibele meterstand,2,2,0,0,False,2,0
+24814,2025-09-01,2025,Inloggen met SMS S34-2999,2,2,0,0,False,2,0
+24813,2025-08-29,2025,Inloggen met SMS S34-2893,2,2,0,0,False,2,0
+24812,2025-08-29,2025,Inloggen met SMS S34-2958,2,2,0,0,False,2,0
+24811,2025-08-29,2025,Inloggen met SMS S34-2954,4,4,0,0,False,4,0
+24808,2025-08-29,2025,ITS-259225 Uitbouwen rioolheffing Brummen,5,5,0,0,False,5,0
+24807,2025-08-29,2025,S34-3203 Heffingsplafond naar 50.000m3,6,6,0,0,False,6,0
+24805,2025-08-28,2025,Inloggen met SMS S34-2892,10,10,0,0,False,10,0
+24804,2025-08-28,2025,Inloggen met SMS S34-3197,2,2,0,0,False,2,0
+24760,2025-08-27,2025,Inloggen met SMS S34-2891,8,8,0,0,False,8,0
+24527,2025-07-29,2025,HIP-330,2,2,1,1,True,2,0
+24482,2025-07-21,2025,Migratietesten,3,3,0,0,False,3,0
+24481,2025-07-21,2025,S34-1816 rapportage EIB testen,2,2,0,0,False,2,0
+24480,2025-07-21,2025,Regressie sluitredenen testen,66,66,0,0,False,62,2
+24477,2025-07-21,2025,KVK API inzetten in aanmaken zakelijke klant in S4 en C4C,8,8,0,0,False,8,0
+24278,2025-07-04,2025,ITS-275883 Duplicatenrapportage ZVT_DUPLICATE_FINDER bevat een selectiefout waardoor er te veel records worden gevonden,4,4,0,0,False,4,0
+24240,2025-07-01,2025,"S34-3025 Aanpassen framework ""Nieuwe aansluitingen"", ""Meterverwisselingen/Perceel App"" en ""Aan- en Afmeldproces",17,17,0,0,False,15,0
+24094,2025-06-23,2025,S34-2082 Optimaliseren inlogproces via SMS,10,0,0,0,False,0,0
+24089,2025-06-20,2025,S34-3028 KvK api integratie in creatieproces bp C4 en S4,20,20,0,0,False,20,0
+23940,2025-06-16,2025,"S34-3085 Na verrijken meternummer wordt onterecht kanaal ""handmatig"" meegegeven.",1,1,0,0,False,1,0
+23939,2025-06-16,2025,"""Mag naar prullenbak""",1,0,0,0,False,0,0
+23855,2025-06-10,2025,S34-2565 Opslaan verzenddatum F310 herinnering,8,8,1,1,True,8,0
+23847,2025-06-06,2025,Aanvullende functionaliteiten duplicatenrapportage,2,2,0,0,False,2,0
+23768,2025-06-03,2025,S34-2844  Verrijken meternummer middels photo-analyzer GAT,8,8,1,1,True,8,0
+23597,2025-05-22,2025,S34-2844  Verrijken meternummer middels photo-analyzer,9,9,1,1,True,7,0
+23457,2025-05-13,2025,S34-2812 Conversieprogrammatuur tbv BOL-correcties,7,7,0,0,False,7,0
+23330,2025-05-01,2025,Test Run 1-5-2025,20,20,0,0,False,20,0
+23246,2025-04-22,2025,"S34-2818 KVK API, inzet ISS aanmelden nieuwe zakelijke klant",24,24,0,0,False,24,0
+23175,2025-04-10,2025,Ketentest EIB,58,58,0,0,False,52,0
+23107,2025-04-03,2025,S34-2901 Wijziging routerings regels tbv AI routeren,1,1,0,0,False,1,0
+23078,2025-04-02,2025,ITS-267912 Taskforce EIB,3,3,0,0,False,3,0
+23052,2025-03-31,2025,S34-1847 Als Vitens en Evides wil ik dat de facturatie t.b.v. de BOL over meerdere installaties correct (per aansluiting (WOZ) wordt berekend.,51,51,2,2,True,35,10
+22961,2025-03-27,2025,S34-1847 Sanity Test BOL facturatie meerdere bemeterde installaties,7,7,0,0,False,7,0
+22941,2025-03-26,2025,ITS-266170 Automatisch bijwerken zakenpartner veroorzaker voor NWG facturatie,1,1,0,0,False,1,0
+22906,2025-03-25,2025,S34-952,1,1,0,0,False,1,0
+22681,2025-03-13,2025,S34-2785 Rapportage duplicaten,1,1,0,0,False,1,0
+22611,2025-03-11,2025,<To be deleted>,1,0,1,0,True,0,0
+22587,2025-03-10,2025,Regressietest EIB technisch live,109,109,0,0,False,96,0
+22517,2025-02-27,2025,S34-2730 2 nieuwe ticket categorieën aanmaken,6,6,0,0,False,6,0
+22390,2025-02-25,2025,ITS-262986 Change - Minor change. Dubbele percelen met BAG-reden negeren in resultaten webservice.,1,1,0,0,False,1,0
+22354,2025-02-20,2025,S34-2748 Autorisatie API koppeling oninbaar boeken,1,1,0,0,False,1,0
+22222,2025-02-17,2025,ITS-263717 ISS - Ingelogd Aanmelden,1,1,0,0,False,1,0
+21989,2025-02-03,2025,S34-2417 - EIB interface: Realisatie dossiers afhandeling (IB/OB service),87,85,0,0,False,69,3
+21984,2025-01-31,2025,ITS-262050 Ingelogd afmelden S34-2710,1,1,0,0,False,1,0
+21928,2025-01-28,2025,S34-2058 - Als Vitens wil ik dat de BOL berekening voor maandelijkse AMR meters correct wordt uitgevoerd,30,30,3,3,True,27,0
+21694,2025-01-16,2025,"S34-2542 Kanaal van ticket wordt foutief op ""overig"" gezet, moet internet zijn.",3,3,0,0,False,3,0
+21664,2025-01-15,2025,Automatisch loggen,26,26,0,0,False,8,0
+21618,2025-01-13,2025,ISS - Photoanalyzer (Opzeggen en Extra adres aanmelden),4,4,0,0,False,4,0
+21617,2025-01-13,2025,ISS - Photoanalyzer (Opzeggen en Extra adres aanmelden),2868,0,80,0,True,0,0
+21584,2025-01-08,2025,S34-2753 EIB: Migratie bestaande dossiers,11,11,0,0,False,11,0
+21563,2025-01-06,2025,S34-796 Intake voor pentest EIB API,20,20,0,0,False,19,1
+21346,2024-12-10,2024,ACC deploy Photo-analyzer,16,16,0,0,False,9,0
+21337,2024-12-09,2024,Tussentijdse afdracht EIB (TTA),55,55,0,0,False,49,0
+21323,2024-12-09,2024,ISS Afmelding en extra adres aanmelden. Acceptatie omgeving,39,39,0,0,False,39,0
+21218,2024-11-26,2024,S34-2589: EIB interface: Realisatie response dossier status update (DS),22,22,0,0,False,22,0
+21179,2024-11-25,2024,ISS Afmelding en extra adres aanmelden. Test omgeving,39,37,0,0,False,34,2
+19943,2024-10-28,2024,S34-2416 Heenweg responseafhandeling (EIB API),90,90,0,0,False,78,0
+19795,2024-10-17,2024,ITS-249993 Stroom 3.x regulier transport 22 oktober,5,5,0,0,False,5,0
+19588,2024-10-09,2024,GAT S34-2210/2211/2218,53,41,0,0,False,38,3
+19480,2024-10-03,2024,Nazorg WKI,17,17,0,0,False,17,0
+19466,2024-10-01,2024,"S34-2407: Evides overdracht altijd eerst naar Flanderijn, uitzonderingen inbouwen",5,5,0,0,False,5,0
+19358,2024-09-23,2024,Zuiverheid en validatie zakenpartner part 2,1,1,0,0,False,1,0
+19309,2024-09-18,2024,S34-796: Incassobureau data uitwisseling​ heenweg,71,71,0,0,False,60,0
+19131,2024-09-05,2024,Zuiverheid en validatie zakenpartner part 1,3,3,0,0,False,3,0
+19119,2024-09-04,2024,Test Run 4-9-2024 S34-2210/2211/2218,25,25,0,0,False,17,2
+19098,2024-09-02,2024,S34-2349 Reminderservice 90 dagen,3,3,0,0,False,3,0
+19083,2024-08-28,2024,S34-2350 Bouw validatie rol 3 kiezen tarief passend bij meter (eerste minimale validatie),6,6,0,0,False,6,0
+19006,2024-08-22,2024,S34-2285 BR inzetten op e-mail,20,20,0,0,False,19,0
+19001,2024-08-21,2024,S34-2211 Aanmelden nieuwe klant. Als zakelijke klant wil ik mijn meterstand via een foto kunnen doorgeven,4,4,0,0,False,4,0
+18974,2024-08-19,2024,S34-2210 Aanmelden nieuwe klant. Als particuliere klant wil ik mijn meterstand via een foto kunnen doorgeven,4,4,0,0,False,3,0
+18507,2024-08-03,2024,Deeplinks,1,1,0,0,False,1,0
+18488,2024-08-01,2024,ITS-241510 regressietest aanmanen,3,3,0,0,False,3,0
+18378,2024-07-15,2024,ITS-241860 Photoanalyzer implementatie,3,3,0,0,False,3,0
+18180,2024-06-24,2024,WKI,95,95,0,0,False,95,0
+18048,2024-06-13,2024,S34-2116: Uitsluiten aanmaanblokkades bij vrijgave voor EIB (FP03M) leidt niet tot uitsluiten,12,12,0,0,False,12,0
+17924,2024-06-10,2024,S34-2121 Update SAPUI5 version i.v.m. End of Cloud Provisioning (1.96.20 -> 1.96.32),3,3,0,0,False,2,0
+17916,2024-06-07,2024,S34-1185 miniregressietest verzamelvoorschotfacturatie,1,1,0,0,False,1,0
+17787,2024-05-31,2024,S34-1185: Verschuiven boekdatum facturatie automatische incasso,32,32,0,0,False,32,0
+17744,2024-05-29,2024,SR tickets van evides gaan niet meer naar een Evides team maar naar t zelfde team als Vitens tickets,1,1,0,0,False,1,0
+17727,2024-05-27,2024,"S34-2052 Foto tonen in controleer_bevestig scherm, als via de analyzer gegaan is,",1,1,0,0,False,1,0
+17725,2024-05-27,2024,S34-1866 Als Evitens wil ik de meerdere meters functionaliteit loskoppelen van het oude proces,1,1,0,0,False,1,0
+17724,2024-05-27,2024,"S34-1596 Als Evitens wil ik als via de handmatige invoer een meterstand wordt ingevoerd, bij een implausibele meterstand, de mogelijkheid wordt geboden om een foto te maken",1,1,0,0,False,1,0
+17573,2024-04-30,2024,S34-1576 ISS Bestaande klanten hergebruiken en voorkomende nieuwe dubbele klanten,2,0,0,0,False,0,0
+17572,2024-04-30,2024,S34-1575 C4C Bestaande klanten hergebruiken en voorkomende dubbele klanten,14,14,0,0,False,14,0
+17571,2024-04-30,2024,S34-1564 Inzicht in kwaliteit zakenpartner gegevens en juist gebruik,2,0,0,0,False,0,0
+17570,2024-04-30,2024,S34-954 Zuiverheid en validatie BAG,9,0,0,0,False,0,0
+17569,2024-04-30,2024,S34-952 Zuiverheid en validatie KVK API,11,0,0,0,False,0,0
+17491,2024-04-16,2024,S34-953 Zuiverheid en validatie E-mailadres,3,0,1,0,True,0,0
+17490,2024-04-16,2024,S34-950 Zuiverheid en validatie naamveld,3,0,0,0,False,0,0
+17489,2024-04-16,2024,S34-951 Zuiverheid en validatie geboortedatum,3,0,0,0,False,0,0
+17459,2024-04-05,2024,S34-1162 Reminder service http returncode 200 wordt niet goed verwerkt,1,1,0,0,False,1,0
+17393,2024-04-04,2024,ITS-228473 Change - Openstaande posten W100 niet meenemen wanneer deze extern zijn overgedragen,1,1,0,0,False,1,0
+17355,2024-04-02,2024,S34-1405 UI5 / Problemen bij opsturen meterstanden en/of openstaande posten bij Paragon bij klant met veel adressen,2,2,0,0,False,2,0
+17343,2024-03-29,2024,S34-1922  Verzamelklant: bugs bij downloaden naar desktop,3,3,0,0,False,3,0
+17339,2024-03-29,2024,S34-1842 miniregressietest F280,1,1,0,0,False,1,0
+17320,2024-03-28,2024,S34-1841 vergelijken teksten BRF+ voor formulieren,1,1,0,0,False,1,0
+17276,2024-03-26,2024,335955 ITS-229823 - Floris Westenberg - Photo Analyzer,1,1,0,0,False,1,0
+17272,2024-03-26,2024,S34-1480 [CPI] Toevoegen extreme min- en max-waardes aan get_meterreaddata,1,1,0,0,False,1,0
+17271,2024-03-26,2024,"S34-943 Als Evitens wil ik dat de doorgegeven foto wordt opgeslagen, zodat",1,1,0,0,False,1,0
+17268,2024-03-26,2024,S34-1593 Meterstandenoproep (formulier) actualiseren,1,1,0,0,False,1,0
+17267,2024-03-26,2024,S34-944 PA3. Controleer en bevestig indien stand NIET afrekenbaar,10,10,0,0,False,10,0
+17266,2024-03-26,2024,S34-940 PA2A. Foto uitlezen mislukt,1,1,0,0,False,1,0
+17265,2024-03-26,2024,S34-939 Loader verwerken foto op submitpagina PA1,2,2,0,0,False,2,0
+17264,2024-03-26,2024,S34-1606 Als Evitens wil ik dat in geval van extreem verbruik de meterstand niet automatisch wordt geplausibiliseerd,1,1,0,0,False,1,0
+17255,2024-03-25,2024,Foto Analyzer Gat test.,14,6,0,0,False,6,0
+17240,2024-03-21,2024,S34-957 Als Evitens wil ik dat de content juist getoond wordt bij iedere stap in het samengestelde meterstandpagina's,1,1,0,0,False,1,0
+17239,2024-03-21,2024,S34-958  Als Evitens wil ik dat de stappen in het meterstandproces gemeten kunnen worden in GA4,1,1,0,0,False,1,0
+17236,2024-03-21,2024,S34-1584 Als Evitens wil ik dat specifieke (uitval) redenen het meterstandproces gemeten kunnen worden in GA4,5,5,0,0,False,5,0
+17235,2024-03-21,2024,S34-1584 Als Evitens wil ik dat specifieke (uitval) redenen het meterstandproces gemeten kunnen worden in GA4,5,3,0,0,False,3,0
+17234,2024-03-21,2024,S34-1584 Als Evitens wil ik dat specifieke (uitval) redenen het meterstandproces gemeten kunnen worden in GA4,5,3,0,0,False,3,0
+17200,2024-03-21,2024,S34-958  Als Evitens wil ik dat de stappen in het meterstandproces gemeten kunnen worden in GA4,1,0,0,0,False,0,0
+17199,2024-03-21,2024,S34-1584 Als Evitens wil ik dat specifieke (uitval) redenen het meterstandproces gemeten kunnen worden in GA4,5,0,0,0,False,0,0
+17190,2024-03-20,2024,S34-1600 ZDLC downloadtool,17,17,0,0,False,14,0
+17189,2024-03-20,2024,S34-1864 Exploratief testen ZDLC,1,1,0,0,False,1,0
+17169,2024-03-18,2024,S34-1785 Als contentbeheerder wil een preview (in de experience editor) van de samengestelde meterstandenpagina.,2,2,0,0,False,2,0
+17167,2024-03-18,2024,S34-1785 Als contentbeheerder wil een preview (in de experience editor) van de samengestelde meterstandenpagina.,2,2,0,0,False,2,0
+17018,2024-03-12,2024,S34-828 bugfix direct debit sepa mandates,5,5,0,0,False,5,0
+17008,2024-03-11,2024,S34-1216 verkeerd adres F332,1,1,0,0,False,1,0
+16829,2024-02-28,2024,ISS - Release Google Analytics 4 eventss,7,7,0,0,False,7,0
+16820,2024-02-27,2024,Foto Analyzer,14,14,0,0,False,14,0
+16818,2024-02-27,2024,S34-800 Test Run 27-2-2024,1,1,0,0,False,1,0
+16814,2024-02-27,2024,S34-1070 autorisatie AFO BI_2CZICAPRMS2PIC_Q001,1,1,0,0,False,1,0
+16813,2024-02-27,2024,ITS-222836 Heraansluitingsticket worden niet gesloten i.v.m. verkeerde oorzaak categorie,1,1,0,0,False,1,0
+16800,2024-02-26,2024,S34-1468 GA4 Events. Mijn Omgeving. Success_message,1,1,0,0,False,1,0
+16799,2024-02-26,2024,S34-1467 GA4 events. Mijn Omgeving. Extra_login_code.,1,1,0,0,False,1,0
+16798,2024-02-26,2024,S34-1465 GA4 Events. Adress not found.,1,1,0,0,False,1,0
+16797,2024-02-26,2024,S34-1463 GA4 Events. FAQ open,2,2,0,0,False,2,0
+16796,2024-02-26,2024,"Dubbel, mag weg -- S34-1463 GA4 Events. FAQ open",2,2,0,0,False,2,0
+16753,2024-02-20,2024,S34-509 UI5 TEST / Verschil in weergave FPL9 en Paragon,1,1,0,0,False,1,0
+16749,2024-02-20,2024,S34-1472 UI5 / Toesturen informatie Verzamelklant/Contact alleen via E-mail,1,1,0,0,False,1,0
+16748,2024-02-20,2024,S34-1472 UI5 / Toesturen informatie Verzamelklant/Contact alleen via E-mail,2868,0,80,0,True,0,0
+16747,2024-02-20,2024,S34-1175 UI5 TEST Paragon leesvenster leeg bij onbekende klant,1,1,0,0,False,0,0
+16724,2024-02-20,2024,S34-1657 DNWG Watermeterplaatsing op een NABIJ adres - C4 object status niet aangepast - NOK,2,2,0,0,False,2,0
+16719,2024-02-19,2024,S34-1194 Als Evitens wil ik dat in de handmatige meterstandenflow in geval van een implausibele stand,2,2,0,0,False,2,0
+16700,2024-02-15,2024,S34-1302: UI5 TEST / Tickets vanuit KCC met verzendkanaal email moeten een emailadres hebben,1,1,0,0,False,1,0
+16695,2024-02-15,2024,S34-1640/S34-1642 Bedrag laatste betaling onjuist weergegeven op Contract Account in C4C,1,1,0,0,False,1,0
+16693,2024-02-15,2024,S34-1188 Ten onrechte Voorrijkosten bij Evides Gerechtelijke Afsluiting,1,1,0,0,False,1,0
+16669,2024-02-13,2024,S34-1394 Als Evitens wil ik dat als een foto niet plausibel is...,3,3,0,0,False,3,0
+16667,2024-02-13,2024,"S34-1083 Als Evitens wil ik dat overmatig en onrechtmatig gebruik van de API in het proces wordt voorkomen, zodat",1,1,0,0,False,1,0
+16660,2024-02-12,2024,S34-299 Uitbreiden overdracht incassobureau (verzamelfactuurnr),1,1,0,0,False,1,0
+16656,2024-02-09,2024,ITS-224786,1,1,0,0,False,1,0
+16651,2024-02-09,2024,Test Run 9-2-2024,1,1,0,0,False,1,0
+16615,2024-02-07,2024,S34-1357: betaling boekt niet volledig op meegegeven factuurnummers,1,1,0,0,False,1,0
+16604,2024-02-06,2024,S34-941 PA3 Controleer en bevestig indien stand afrekenbaar,8,8,0,0,False,8,0
+16544,2024-02-02,2024,S34-1528 Betaling Verzamelfactuur wordt onterecht terugbetaald,1,1,0,0,False,1,0
+16539,2024-02-02,2024,S34-1402 Vroegsignalering 9 blokkade krijgt einddatum,1,1,0,0,False,1,0
+16508,2024-01-31,2024,"S34-960 Als Evitens wil ik dat de foto correct verstuurd en ontvangen wordt, zodat ik het resultaat kan gebruiken",2,2,0,0,False,2,0
+16504,2024-01-30,2024,S34-1516 Verkeerde VF nummers DFKKOP,2,2,0,0,False,2,0
+16485,2024-01-30,2024,S34-942 Als Sitecore/contentbeheerder wil ik de nieuwe meterstandenflow flexibel aan/uit kunnen zetten,2,2,0,0,False,2,0
+16484,2024-01-30,2024,HERTEST:  S34-1520 Onterecht opgehoogd naar W040,2,2,1,1,True,2,0
+16483,2024-01-30,2024,S34-942 Als Sitecore/contentbeheerder wil ik de nieuwe meterstandenflow flexibel aan/uit kunnen zetten,2,0,0,0,False,0,0
+16442,2024-01-24,2024,<to be deleted>,3,0,2,0,True,0,0
+16425,2024-01-23,2024,"S34-1213 Als Evitens wil ik dat indien er sprake is van meerdere meters op een perceel, de meterstand via de handmatige methode wordt ingevoerd, omdat...",1,1,0,0,False,1,0
+16424,2024-01-23,2024,S34-939 Loader verwerken foto op submitpagina PA1,2,2,0,0,False,2,0
+16391,2024-01-23,2024,S34-1520 Onterecht opgehoogd naar W040,4,4,3,3,True,4,0
+16376,2024-01-19,2024,Test Run 19-1-2024,1,1,0,0,False,1,0
+16375,2024-01-19,2024,S34-314 en S34-315 F318 tests,2,2,0,0,False,2,0
+16310,2024-01-16,2024,S34-1388 Inkomende betaling klant in FPL9 als pinbetaling omschreven,1,1,0,0,False,1,0
+16301,2024-01-12,2024,S34-1339 ticket aanmaken bij opnameorder ZVC,2,2,0,0,False,2,0
+16297,2024-01-12,2024,"S34-1241 F280 brief, laatste cijfers van IBAN niet getoond op brief",1,1,0,0,False,1,0
+16292,2024-01-12,2024,S34-938 PA1. Stand invoeren op basis van foto maken of uploaden,6,6,0,0,False,6,0
+16258,2024-01-10,2024,ITS-220395 VF nummer bij meerdere zp's igv creditnota,4,4,0,0,False,4,0
+16149,2024-01-08,2024,S34-1312,1,1,0,0,False,1,0
+16116,2023-12-22,2023,Bounce F305 en F306,4,4,0,0,False,4,0
+16065,2023-12-20,2023,S34-293 Creditbedrag Verzamelklant wordt niet uitbetaald,1,0,0,0,False,0,0
+16064,2023-12-20,2023,S34-1340 Uitleg over verrekening niet juist weergegeven op factuur,1,1,0,0,False,1,0
+16063,2023-12-20,2023,S34-1340 Uitleg over verrekening niet juist weergegeven op factuur,1,1,0,0,False,1,0
+16057,2023-12-20,2023,S34-532 bepaalde records in ZISU_GEPL_AFSLUI blijven op status 1 staan,87,1,0,0,False,1,0
+16037,2023-12-19,2023,S34-1311 Afsluitbrief geeft onjuist openstaand saldo,1,1,0,0,False,1,0
+16031,2023-12-19,2023,"S34-1307 BUG: ISS AI betaalde PA met vereffeningsdatum in toekomst wordt aan klant getoond als 0,00 euro",1,1,0,0,False,1,0
+16023,2023-12-15,2023,Test Run 15-12-2023,1,1,0,0,False,1,0
+16021,2023-12-14,2023,S34-1230 Onterechte Aanmeldkosten zichtbaar op de bevestiging aanmelding.,1,1,0,0,False,1,0
+16020,2023-12-14,2023,Test Run 14-12-2023,2,2,0,0,False,2,0
+16019,2023-12-14,2023,"S34-966 Contractrekening is Afrikaans, klant kan niet worden gefactureerd",1,1,0,0,False,1,0
+15998,2023-12-13,2023,"S34-890 Foutmelding bij rapportage ""Afgesloten percelen""",2,2,0,0,False,2,0
+15995,2023-12-13,2023,S34-1400 BKR melding terugkoppeling niet gevuld,1,1,0,0,False,1,0
+15994,2023-12-13,2023,S34-1401 Vroegsignalering aanlevering BKR/RIS niet correct,1,1,0,0,False,0,0
+15993,2023-12-13,2023,"S34-1269 Als Evitens wil ik een digital share rapportage over Uitstel van betaling, zodat....",1,1,0,0,False,1,0
+15985,2023-12-13,2023,S34-480 Aanmaken zakelijke klant Evides lukt niet (S34-155),1,1,0,0,False,1,0
+15982,2023-12-12,2023,S34-1378 veld 'InvoiceReference' toevoegen bij de ISS flows.,1,1,0,0,False,1,0
+15936,2023-12-12,2023,S34-1399 Update call reasons voor de mail/post onderwerpen,1,1,0,0,False,0,0
+15916,2023-12-11,2023,S34-1360 ISS meterstand doorgeven voor perceel met BBI belandt in backup-flow,1,1,0,0,False,1,0
+15903,2023-12-11,2023,Aanmanen verzamelklanten met contactpersonen,4,4,0,0,False,3,0
+15900,2023-12-11,2023,S34-1374 FPL9: verzamelklant Vitens/Evides,2,2,0,0,False,2,0
+15842,2023-12-08,2023,S34-1230 Onterechte Aanmeldkosten zichtbaar op de bevestiging aanmelding.,1,1,0,0,False,1,0
+15840,2023-12-08,2023,S34-1373 betalingen EIB kunnen niet gestorneerd worden naar tussenrekening via FP08,1,1,0,0,False,1,0
+15837,2023-12-07,2023,S34-1359 Implausibele meterstand: Ticketview en in S4 verwerking,1,1,0,0,False,1,0
+15824,2023-12-06,2023,S34-331 - Vitens aanvullend - Betaling wordt op vorderingen met vorderingen aanmaanblokkade geboekt,1,1,0,0,False,1,0
+15819,2023-12-05,2023,S34-1233 Afmelding na kapping niet mogelijk indien op afmelddatum geen meter bekend is.,1,1,0,0,False,1,0
+15818,2023-12-05,2023,S34-1247 Afzender e-mail wordt bij beantwoorden niet weergegeven,1,1,0,0,False,1,0
+15810,2023-12-05,2023,S34-350 & S34-511 Gecombineerd transport voor oplossing verkeerde afletteringsvolgorde en onterechte uitbetaling,2,2,0,0,False,2,0
+15807,2023-12-04,2023,S34-887 Uitval ISS KF PT MF,1,1,0,0,False,1,0
+15762,2023-12-01,2023,S34-1338 - Paralellisatie Collective MR,2,2,0,0,False,2,0
+15761,2023-12-01,2023,S34-269 PT AA fout bij aanmaken bevestiging aanmelding C4 autorisatie aanvragen mis een bevoegdheid.,1,1,0,0,False,1,0
+15757,2023-11-30,2023,S34-1305 Toevoegen SubtenantID tbv Paragon uitsplitsing facturatie Vitens / Evides,1,1,0,0,False,1,0
+15755,2023-11-30,2023,S34-1313 Inkomende betalingen met kenmerk verzamelklant maar niet bestemd voor is voor een VK,1,1,0,0,False,1,0
+15750,2023-11-29,2023,S34 788 Reden Aanmelding WBV/Verhuur/Woonst. bij Reden geen aanmeldkosten toevoegen,1,1,0,0,False,1,0
+15749,2023-11-29,2023,S34-1270 Extra reden geen aanmeldkosten toevoegen,1,1,0,0,False,1,0
+15748,2023-11-29,2023,S34-244 NAZORG: Bij afmelding in C4 wordt geen contractnummer meegestuurd op ACC / PRD,1,1,0,0,False,1,0
+15747,2023-11-29,2023,S34-1306 F253 Opname verzoek Verzamelklanten,1,1,0,0,False,1,0
+15741,2023-11-29,2023,S34-1212 (Her)afdruk Batch via Batchprogrammatuur,2,2,0,0,False,2,0
+15738,2023-11-29,2023,<To be deleted>,1,0,0,0,False,0,0
+15737,2023-11-29,2023,S34-1303 Z-ISU Collective dumpt op F300 tegenboeking met verwijderd voorschotplan,1,1,0,0,False,1,0
+15733,2023-11-28,2023,S34-1304 Rapport kijkt naar verkeerde ROOT,1,1,0,0,False,1,0
+15725,2023-11-27,2023,S34-1212 Tijdschijven verzamelfactuur,3,3,0,0,False,1,0
+15723,2023-11-27,2023,S34-1265 bugfixes ZISU_PAYMENT_LOT_TICKETS_REPAY,1,1,0,0,False,1,0
+15721,2023-11-27,2023,S34-1266 Shortdump FPCI,1,1,0,0,False,1,0
+15717,2023-11-27,2023,S34-1267 Afmleding met uitval door deel verrekend  voorschot,1,1,0,0,False,1,0
+15715,2023-11-24,2023,S34-1291 Herafdrukken verzamelnota's,11,11,2,2,True,9,0
+15713,2023-11-24,2023,S34-797 Dump bij inhuizing of afmelding,1,1,0,0,False,1,0
+15692,2023-11-23,2023,Rapportage aantallen contacten,1,1,0,0,False,1,0
+15658,2023-11-22,2023,<To be deleted>,6,0,0,0,False,0,0
+15656,2023-11-22,2023,S34-1208 Herinneren en aanmanen verzamelklanten,24,24,0,0,False,20,0
+15644,2023-11-22,2023,S34-1201 BTW oninbaar: Bij uitval ticket niet te zien om welk klantnummer het gaat,4,4,0,0,False,4,0
+15637,2023-11-21,2023,"S34-966 Contractrekening is Afrikaans, klant kan niet worden gefactureerd",1,1,0,0,False,1,0
+15634,2023-11-21,2023,ITS-214504 Ver. als voorvoegsel,1,1,0,0,False,1,0
+15632,2023-11-21,2023,S34-1264 Categorie Tarieven 2024,4,4,0,0,False,4,0
+15615,2023-11-21,2023,S34-774 Hoog VSP bij aanmelding,2,2,0,0,False,2,0
+15608,2023-11-20,2023,S34-1088 IVR uitval PT MF,5,1,0,0,False,0,1
+15607,2023-11-20,2023,S34-428 Betaling wordt verrekend met recentste vordering waar een AI op staat terwijl er oudere vordering aanwezig is,1,1,0,0,False,1,0
+15594,2023-11-16,2023,S34-1196 Aan-/afmelden Rapport- extra velden toevoegen,1,1,0,0,False,1,0
+15593,2023-11-16,2023,To be deleted,1,0,0,0,False,0,0
+15592,2023-11-16,2023,S34-1077 Voorschotplannen 2024 / 2025 worden aangemaakt ipv 2023 2024,1,1,0,0,False,1,0
+15588,2023-11-16,2023,S34-812 Blokkades 5 en 1 worden door facturatie verwijderd,2,2,0,0,False,2,0
+15587,2023-11-16,2023,To be deleted,1,0,0,0,False,0,0
+15578,2023-11-15,2023,S34-1218 Bugs Externe Incassobureau (EIB) proces,1,1,0,0,False,1,0
+15577,2023-11-15,2023,S34-1082 Gemeente zwolle (0193) ontbreekt in tabel BEPAAL_GEMEENTE_DET,1,1,0,0,False,0,0
+15565,2023-11-14,2023,S34-1050 - Ophogen van W020 naar W040 te vroeg,3,3,0,0,False,3,0
+15563,2023-11-14,2023,S34-1116 Aanpassen tolerantiegrens Afrekenbaar maken meterstand,10,10,0,0,False,10,0
+15561,2023-11-14,2023,S34-1192 Leegstand AA verbruikplaats niet meer aansluiten leegstand,1,1,0,0,False,1,0
+15549,2023-11-14,2023,S34-1184 FP04M – Foutmeldingen Applicatielog AFB2,1,1,0,0,False,1,0
+15548,2023-11-14,2023,S34-1044 Meterstand afrekenbaar maken,2,2,1,1,True,2,0
+15547,2023-11-14,2023,S34-1164 Rapportage betalingsoverzicht,1,1,0,0,False,1,0
+15528,2023-11-10,2023,S34-1084 ISS wijzigen maand en bedrag anders dan op JA,1,1,0,0,False,1,0
+15526,2023-11-09,2023,S34-1166 Aan- en afmelden Rapport- Aanmeldkosten # = Aanmeldkosten Ja,1,1,0,0,False,1,0
+15515,2023-11-08,2023,S34-947 Fout berekening datums Output Rapportage,1,1,0,0,False,1,0
+15489,2023-11-07,2023,S34-1062 Afgebroken jobs FPVB,1,1,0,0,False,1,0
+15476,2023-11-06,2023,S34-901 Sitecore actief acteren op CPI respons deferralOption,18,18,0,0,False,18,0
+15475,2023-11-06,2023,S34-335 Autorisatie Procesteamleden voor ticketbak PT AA,2,2,0,0,False,2,0
+15469,2023-11-06,2023,S34-271 FonkB kan uitvaltaken Nieuwbouw niet oppakken,1,1,0,0,False,1,0
+15462,2023-11-03,2023,S34-285 - Zakenpartners met foutief kvk nummer,1,1,0,0,False,1,0
+15430,2023-11-01,2023,Bug-fixing Uitstel van Betaling,6,6,0,0,False,6,0
+15429,2023-11-01,2023,S34-930 CPI / S4 Tijdzoneverschil met tot gevolg errorcode 101,1,1,0,0,False,1,0
+15426,2023-11-01,2023,S34-173 Miniregressietest aanmanen,7,7,0,0,False,7,0
+15425,2023-11-01,2023,S34-664 Verschil maandrapportage en facturatie AMR GZ,2,2,0,0,False,2,0
+15422,2023-11-01,2023,SI3-6557 BUG: Wanneer ZFACTUUR en ZMETEROPN gebruikmaken van hetzelfde adres object dan loopt get_customerdata in error,1,1,0,0,False,1,0
+15414,2023-10-31,2023,S34-798 Uitval ivm betaaldag wijzigen via ISS,3,3,0,0,False,3,0
+15411,2023-10-30,2023,S34-173 CPI en tellingen,10,10,0,0,False,10,0
+15401,2023-10-26,2023,S34-808 & S34-827 grensbedragen (buitendienst en overdracht) aanpassen,6,6,0,0,False,6,0
+15388,2023-10-25,2023,S34-712: SAP Incident: 597668/2023 | Tickets periodieke opname buitendienst kunnen niet vanuit S4 voltooid worden,2,2,0,0,False,2,0
+15320,2023-10-23,2023,S34-331 Betaling wordt op vorderingen met vorderingen aanmaanblokkade geboekt,1,1,0,0,False,1,0
+15313,2023-10-20,2023,S34-173 Facturatie verzamelklant periodieke afrekening,32,32,0,0,False,30,0
+15312,2023-10-20,2023,S34-805 Te vroege opnameorder,3,3,0,0,False,3,0
+15268,2023-10-20,2023,S34-772 Shortdump FPCI,1,1,0,0,False,1,0
+15263,2023-10-20,2023,S34-780 Geen mislukte automatische incasso en factuurstorno verwerken met transactie FPCRL,1,1,0,0,False,1,0
+15262,2023-10-20,2023,S34-176 Betalingen afkomstig van Syncasso wordt automatisch door SAP teruggestort,2,2,0,0,False,2,0
+15261,2023-10-20,2023,S34-176 Betalingen afkomstig van Syncasso wordt automatisch door SAP teruggestort,2868,1,80,0,True,1,0
+15248,2023-10-19,2023,S34-173 Betalen verzamelklant,16,16,0,0,False,16,0
+15246,2023-10-19,2023,S34-173 Facturatie verzamelvoorschot,31,31,0,0,False,29,0
+15239,2023-10-18,2023,S34-534 ZISU_MAINTAIN_LOCKS,4,4,0,0,False,4,0
+15216,2023-10-18,2023,S34-533 ontbrekende autorisatie FPP4,1,1,0,0,False,1,0
+15215,2023-10-17,2023,Toestaan a-conto en bewaking door systeem van betalingen door het Externe incasso bureau,1,1,0,0,False,1,0
+15146,2023-10-13,2023,S34-175 Betaling doorstorten naar extern incassobureau,3,3,0,0,False,3,0
+15125,2023-10-11,2023,S34-770 FAT test van de communicatie data massatool,16,16,0,0,False,16,0
+15121,2023-10-11,2023,SI3-2338 ISS - Uitstel van Betalen,14,14,0,0,False,2,0
+15120,2023-10-11,2023,S34-761 ontbrekende C4C tickets uitval betalingen,1,1,0,0,False,1,0
+15099,2023-10-09,2023,S34-345	 F150 en F148 - iDoc met voorkeurskanaal 21003 = SMS,3,3,1,1,True,3,0
+15091,2023-10-05,2023,SAP Stroom 3.4 K&F S34-291 Aanmaankosten zijn niet doorbelast in FPL9,2,2,0,0,False,2,0
+15055,2023-09-29,2023,S34-177 medewerkers kunnen nog wel bankrekeningnummers wijzigen van betaalstapel,1,1,0,0,False,1,0
+15054,2023-09-29,2023,Stroom 3.4 K&F - S34-88 SAP Incident: 562162/2023 | Ticket blijft op naam en team initiele behandelaar na routeren,5,5,0,0,False,5,0
+15047,2023-09-28,2023,Stroom 3.4 K&F - S34-287 Veld Reden aanmaanblokkade toevoegen aan Betalingsoverzicht rapport,1,1,0,0,False,1,0

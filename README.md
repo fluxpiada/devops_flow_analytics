@@ -19,15 +19,21 @@ op basis van wat Jira en TestRail al registreren. Geen urenregistratie nodig.
 ```bash
 uv sync
 
-# analyse van één story + testrun (snel, zonder historie-scan)
-uv run python scripts/testauto_businesscase.py --jira S34-2907 --run 26442 --skip-corpus
+# analyse van één testrun (snel, zonder historie-scan)
+# de Jira-story wordt afgeleid uit de refs van de run
+uv run python scripts/testauto_businesscase.py --run 26442 --skip-corpus
 
 # volledig, inclusief frequentie-historie van de hele suite (~7 min)
-uv run python scripts/testauto_businesscase.py --jira S34-2907 --run 26442
+uv run python scripts/testauto_businesscase.py --run 26442
 
 # managementdeck uit de laatste analyse
 uv run python scripts/build_mgmt_deck.py
 ```
+
+Geef je zelf `--jira KEY` op, dan wordt die gecontroleerd tegen de `refs` en de naam
+van de run. Klopt de koppeling niet, dan stopt het script: de analyse plakt de
+levenscyclus van één story op de uitvoeringsdata van één run, en zonder koppeling is
+het resultaat wel consistent maar onjuist.
 
 Output komt in `output/`: een JSON met alle cijfers, CSV's (runs, defects,
 tijdlijn, W-stappen, dev/test) en een Markdown-rapport.
@@ -36,10 +42,20 @@ tijdlijn, W-stappen, dev/test) en een Markdown-rapport.
 
 | Wat je wilt | Optie |
 |---|---|
+| Historie-scan overslaan (veel sneller) | `--skip-corpus` |
 | Andere Jira-projecten voor wijzigingsdruk | `--jql-projects "S34, KFDO, ITS"` |
 | Portfolio-analyse via een specifiek epic | `--epic KFDO-123` |
 | Historie-scan beperken | `--max-runs 20` |
 | Ander pad naar credentials | `--creds ../fo_doc_gen/creds.yaml` |
+| Doorgaan zonder Jira-koppeling | `--allow-unlinked` |
+
+De dektekst kun je nalopen vóór het renderen:
+
+| Wat je wilt | Optie op `build_mgmt_deck.py` |
+|---|---|
+| Tekst als bewerkbaar bestand | `--emit-content` → `output/deck_content.md` |
+| Renderen uit die bewerkte tekst | `--content output/deck_content.md` |
+| Ander analysebestand | `--json output/testauto_businesscase_<ts>.json` |
 
 ## Credentials
 
@@ -69,6 +85,17 @@ Deze zijn bewust expliciet, omdat ze de interpretatie van de cijfers bepalen.
   geregistreerd.
 - **De W-code-herkenning voor processtappen is specifiek voor het incassoproces.**
   Voor een ander domein werkt de rest wel, maar vind je geen processtappen.
-- **`build_mgmt_deck.py` is deels een sjabloon.** De tijdlijn en de kengetallen
-  komen uit de data; de argumentatie is geschreven voor één specifieke
-  beslissing en moet je herschrijven voor een andere case.
+- **`get_users` van TestRail geeft 403.** De rolverdeling over testers
+  (professioneel tester versus business/FAM key user) is daardoor niet uit de data
+  vast te stellen.
+- **De argumentatie in het deck blijft een redenering.** Alle getallen worden
+  afgeleid uit de analyse, maar de strekking is geschreven voor één beslissing.
+  Loop de tekst na met `--emit-content` voordat je hem aan een ander publiek toont;
+  wat níét uit de data volgt staat in `deck_content.ASSUMPTIONS`.
+
+## Verantwoording
+
+[`docs/technisch-ontwerp.md`](docs/technisch-ontwerp.md) beschrijft de keten in
+volgorde: welke call, welk veld, welke afleiding, welke aanname — inclusief een
+tabel die per grootheid aangeeft of hij **gemeten**, **afgeleid** of **aangenomen**
+is.

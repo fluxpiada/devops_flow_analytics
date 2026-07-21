@@ -1,0 +1,9 @@
+w_step,cases_in_suite,in_case_study_run,jira_issues,stories,bugs,example
+W010,0,True,18,7,11,KFDO-768 (Task): Uitwerken requirement als W010 de vriendelijke reminder word
+W020,0,True,4,3,1,KFDO-284 (Story): W030: Als de W020 eerder wordt gestuurd dan de W030 sturen i
+W040,0,True,14,4,10,KFDO-1076 (Bug): Verzamelfactuur wil niet door in aanmaanproces naar W040
+W060,0,True,3,1,2,KFDO-730 (Epic): Vitens - Aanpassing in W040 (freq. en bedrag aanmaning) en W
+W070,0,True,0,0,0,
+W080,0,True,2,1,1,KFDO-705 (Epic): Evides - W080 Drempelbedrag
+W090,0,True,2,0,2,KFDO-1017 (Bug): Voor betaalde aanmaankosten wordt vereffening niet ongedaan 
+W100,0,True,15,3,12,KFDO-1017 (Bug): Voor betaalde aanmaankosten wordt vereffening niet ongedaan 

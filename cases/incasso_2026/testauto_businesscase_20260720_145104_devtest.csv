@@ -1,0 +1,31 @@
+key,scope,issuetype,status,dev_days,test_days,ratio_test_vs_dev,backfilled,summary
+S34-2907,case_study,Story,,33.9,45.0,1.33,False,SIMPEL: W040 De business logica op grensbedrag en niet actieve klant
+S34-3945,case_study,Bug,,0,0,,True,Failed test: W010 Evides particulier vkk email (wel reminder F308)
+S34-3922,case_study,Bug,,0,0,,False,Failed test: Regressie W010 -> W100 Vitens particulier incl migratiedo
+S34-3914,case_study,Story Bug,,0,0,,True,Aanmaanritme Evides incorrect
+S34-3904,case_study,Bug,,0.0,18.7,,False,Failed test: Regressie W010 -> W100 Vitens verzamelklant niet verzamel
+S34-3903,case_study,Bug,,10.0,0,0.0,False,Failed test: Regressie W010 -> W100 Evides verzamelklant niet verzamel
+S34-3881,case_study,Bug,,0.0,5.9,,False,Failed test: W010 Vitens zakelijk vkk email (wel reminder F308)
+S34-3880,case_study,Bug,,0,0,,False,Failed test: W010 Evides particulier vkk email (wel reminder F308)
+S34-3851,case_study,Bug,,0.0,0,,False,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2011073211
+S34-3843,case_study,Bug,,0,0,,False,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2011073211
+S34-3840,case_study,Bug,,0.0,0.0,,False,Failed test: Evides Zakelijk W010 -> W040 grenswaarden dagen plus bedr
+KFDO-271,epic,Story,Resolved,20.2,0,0.0,False,draft: Wegboeken onder €1 op document niveau
+KFDO-273,epic,Story,Analyse,15.1,0,0.0,False,KBR‑lijst inlezen door business i.p.v. beheer
+KFDO-274,epic,Story,In Progress,20.2,0,0.0,False,IBAN‑wijzigingen via KU/Procesteam i.p.v. aanpassingen in BRF+ BEPAAL_
+KFDO-281,epic,Story,Analyse,0,0,,False,Draft: Aanmaanblokkadeproces versimpelen
+KFDO-286,epic,Story,In Progress,0,0,,False,Refinement ISS Incassoproces
+KFDO-287,epic,Story,Analyse,0,0,,False,draft: Vroegsignalering gemeente tabel transport onafhankelijk maken
+KFDO-289,epic,Story,Open,0,0,,False,SIMPEL: Verzamelklanten
+KFDO-549,epic,Story,In Progress,0,0,,False,ING nieuw bestandsformaat SEPA-betalingen
+KFDO-688,epic,Story,Analyse,0,0,,True,Wegboeken onder €1 op document niveau [Vervolg]
+KFDO-695,epic,Story,In Progress,0,0,,False,Testautomation Incassoprocess Business Case
+KFDO-715,epic,Task,Open,0,0,,False,(her)Inrichten Incassoproces in Test Rail
+KFDO-784,epic,Story,Open,0,0,,False,Versimpelen in- en excasso bestanden verwerking
+KFDO-1076,epic,Bug,In Progress,0,0,,True,Verzamelfactuur wil niet door in aanmaanproces naar W040
+S34-2907,epic,Story,Resolved,33.9,45.0,1.33,False,SIMPEL: W040 De business logica op grensbedrag en niet actieve klant
+S34-3734,epic,Story,Resolved,14.9,0.0,0.0,False,Refinement Incassoproces 2026
+S34-3838,epic,Story,Done,0,0,,False,"draft: Meer inzicht in het proces, waar zit wat"
+S34-3850,epic,Story,Resolved,6.2,0.0,0.0,False,draft: Na sluiten boekingsperiode verschillen tussen FICA en FICO
+S34-3989,epic,Story,Resolved,13.7,0.0,0.0,False,K&F - W010 digitale brieven
+S34-3993,epic,Story,Resolved,8.1,7.0,0.86,False,W040 Livegang activiteiten

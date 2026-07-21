@@ -1,0 +1,20 @@
+ts,system,entity,event,phase,detail
+2025-03-31T12:59:09.283000,jira,S34-2908,created,backlog,SIMPEL: W030 Nog niet oprollen
+2025-03-31T13:22:47.248000,jira,S34-2908,status → To Do,backlog,"Buijtenhuis, Jan"
+2025-11-19T10:05:13.110000,jira,S34-2908,status → In Progress,prep,"Westerbeek, Bart"
+2025-12-11T14:40:14.454000,jira,S34-2908,status → In testing,prep,"Westerbeek, Bart"
+2025-12-15T11:23:34,testrail,run 26119,result passed,execution,test 40671617
+2025-12-15T11:25:07,testrail,run 26119,result passed,execution,test 40671939
+2025-12-15T13:38:45,testrail,run 26119,result passed,execution,test 40671618
+2025-12-15T15:21:36,testrail,run 26119,result passed,execution,test 40671620
+2025-12-16T12:07:21,testrail,run 26119,result passed,execution,test 40675550
+2025-12-16T13:21:47,testrail,run 26119,result passed,execution,test 40671623
+2025-12-16T14:02:23,testrail,run 26119,result passed,execution,test 40672841
+2025-12-16T14:25:32,testrail,run 26119,result passed,execution,test 40671619
+2025-12-16T14:27:39,testrail,run 26119,result passed,execution,test 40672840
+2025-12-16T14:43:32,testrail,run 26119,result passed,execution,test 40671622
+2025-12-16T15:30:30,testrail,run 26119,result passed,execution,test 40671621
+2025-12-16T15:31:57,testrail,run 26119,result passed,execution,test 40673743
+2025-12-16T16:22:07,testrail,run 26119,result passed,execution,test 40674647
+2025-12-16T16:23:37,testrail,run 26119,result passed,execution,test 40676453
+2025-12-18T10:19:00.239000,jira,S34-2908,status → Resolved,closure,"Westerbeek, Bart"

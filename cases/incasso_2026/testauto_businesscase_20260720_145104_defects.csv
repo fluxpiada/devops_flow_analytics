@@ -1,0 +1,11 @@
+key,issuetype,status,created,resolved,resolution_days,summary
+S34-3945,Bug,Resolved,2026-02-19,2026-02-19,0.0,Failed test: W010 Evides particulier vkk email (wel reminder F308)
+S34-3922,Bug,Done,2026-02-17,2026-02-25,8.2,Failed test: Regressie W010 -> W100 Vitens particulier incl migratiedocumenten
+S34-3914,Story Bug,Done,2026-02-16,2026-02-25,9.1,Aanmaanritme Evides incorrect
+S34-3904,Bug,Resolved,2026-02-13,2026-03-04,18.9,Failed test: Regressie W010 -> W100 Vitens verzamelklant niet verzamelfactuur en wel verzamelfactuur 1010017121
+S34-3903,Bug,Done,2026-02-13,2026-02-23,10.2,Failed test: Regressie W010 -> W100 Evides verzamelklant niet verzamelfactuur en wel verzamelfactuur 2010657575
+S34-3881,Bug,Resolved,2026-02-11,2026-02-19,7.7,Failed test: W010 Vitens zakelijk vkk email (wel reminder F308)
+S34-3880,Bug,Done,2026-02-11,2026-02-19,7.8,Failed test: W010 Evides particulier vkk email (wel reminder F308)
+S34-3851,Bug,Done,2026-02-06,2026-02-06,0.1,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2011073211
+S34-3843,Bug,Done,2026-01-30,2026-01-30,0.1,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2011073211
+S34-3840,Bug,Done,2026-01-29,2026-01-30,1.0,Failed test: Evides Zakelijk W010 -> W040 grenswaarden dagen plus bedrag en output

@@ -1,0 +1,159 @@
+ts,system,entity,event,phase,detail
+2025-03-31T12:58:25.030000,jira,S34-2907,created,backlog,SIMPEL: W040 De business logica op grensbedrag en niet actie
+2025-03-31T13:22:41.005000,jira,S34-2907,status → To Do,backlog,"Buijtenhuis, Jan"
+2025-12-03T13:54:11.027000,jira,S34-3575,created,backlog,Testen 1 week (incl)
+2025-12-03T13:57:04.220000,jira,S34-3576,created,backlog,Testvoorbereiding Key Users
+2025-12-03T13:57:15.463000,jira,S34-3577,created,backlog,Bestaalstapel klant factuuur enz
+2025-12-16T11:21:37.990000,jira,S34-2907,status → In Progress,prep,"Westerbeek, Bart"
+2025-12-18T10:47:45.395000,jira,S34-3575,status → In Progress,prep,Testen 1 week (incl)
+2025-12-18T10:47:46.798000,jira,S34-3576,status → In Progress,prep,Testvoorbereiding Key Users
+2025-12-18T10:47:49.141000,jira,S34-3577,status → In Progress,prep,Bestaalstapel klant factuuur enz
+2025-12-18T14:04:23.009000,jira,S34-3577,status → Resolved,prep,Bestaalstapel klant factuuur enz
+2025-12-18T14:04:25.734000,jira,S34-3576,status → In testing,prep,Testvoorbereiding Key Users
+2025-12-18T14:04:28.484000,jira,S34-3575,status → In testing,prep,Testen 1 week (incl)
+2026-01-05T09:17:19.692000,jira,S34-3576,status → Resolved,prep,Testvoorbereiding Key Users
+2026-01-19T09:12:13.522000,jira,S34-2907,status → In testing,prep,"Westerbeek, Bart"
+2026-01-22T17:12:33.627000,jira,S34-3577,status → Done,prep,Bestaalstapel klant factuuur enz
+2026-01-26T16:50:51,testrail,run 26442,result note,execution,test 40863459
+2026-01-26T16:50:51,testrail,run 26442,result note,execution,test 40863458
+2026-01-26T16:50:51,testrail,run 26442,result note,execution,test 40863418
+2026-01-26T16:50:51,testrail,run 26442,result note,execution,test 40863457
+2026-01-26T16:50:51,testrail,run 26442,result note,execution,test 40863456
+2026-01-26T16:50:51,testrail,run 26442,result note,execution,test 40863417
+2026-01-26T16:52:27,testrail,run 26442,result note,execution,test 40863414
+2026-01-26T16:52:27,testrail,run 26442,result note,execution,test 40863455
+2026-01-26T16:52:27,testrail,run 26442,result note,execution,test 40863422
+2026-01-26T16:52:27,testrail,run 26442,result note,execution,test 40863415
+2026-01-26T16:52:27,testrail,run 26442,result note,execution,test 40863406
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863461
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863460
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863451
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863450
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863447
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863446
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863438
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863436
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863435
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863434
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863433
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863432
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863431
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863430
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863429
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863413
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863448
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863444
+2026-01-26T16:54:57,testrail,run 26442,result note,execution,test 40863445
+2026-01-26T16:55:46,testrail,run 26442,result note,execution,test 40863420
+2026-01-27T12:15:15,testrail,run 26442,result passed,execution,test 40863445
+2026-01-27T18:20:24,testrail,run 26442,result test_in_progress,execution,test 40863413
+2026-01-29T13:57:22,testrail,run 26442,result passed,execution,test 40863460
+2026-01-29T14:07:02,testrail,run 26442,result passed,execution,test 40863461
+2026-01-29T14:09:49,jira-bug,S34-3840,opened,defect_loop,Failed test: Evides Zakelijk W010 -> W040 grenswaarden dagen
+2026-01-29T14:09:51,testrail,run 26442,result failed,execution,test 40863413 defect S34-3840
+2026-01-30T10:16:48,testrail,run 26442,result note,execution,test 40863413
+2026-01-30T10:21:46,testrail,run 26442,result passed,execution,test 40863413
+2026-01-30T11:08:37,jira-bug,S34-3843,opened,defect_loop,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2
+2026-01-30T11:08:45,testrail,run 26442,result failed,execution,test 40863417 defect S34-3843
+2026-01-30T11:42:06,testrail,run 26442,result passed,execution,test 40863456
+2026-01-30T14:09:57,testrail,run 26442,result passed,execution,test 40863417
+2026-01-30T14:23:29,jira-bug,S34-3843,resolved,defect_loop,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2
+2026-01-30T14:26:20,jira-bug,S34-3840,resolved,defect_loop,Failed test: Evides Zakelijk W010 -> W040 grenswaarden dagen
+2026-02-02T10:54:03.183000,jira,S34-3845,created,execution,Testen verzamelklanten
+2026-02-02T12:15:45.150000,jira,S34-3846,created,execution,Aanpassen procesplaat naincassoproces B2B en VZK
+2026-02-02T12:16:44.228000,jira,S34-3845,status → In Progress,execution,Testen verzamelklanten
+2026-02-02T12:16:48.652000,jira,S34-3846,status → In Progress,execution,Aanpassen procesplaat naincassoproces B2
+2026-02-06T11:24:02,jira-bug,S34-3851,opened,defect_loop,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2
+2026-02-06T11:24:07,testrail,run 26442,result passed,execution,test 40863417 defect S34-3851
+2026-02-06T13:59:36,jira-bug,S34-3851,resolved,defect_loop,Failed test: Regressie W010 -> W100 Evides verzamelfactuur 2
+2026-02-09T10:53:31,testrail,run 26442,result test_in_progress,execution,test 40863458
+2026-02-09T11:55:16,testrail,run 26442,result passed,execution,test 40863418
+2026-02-11T10:13:21,testrail,run 26442,result passed,execution,test 40863458
+2026-02-11T10:32:57,testrail,run 26442,result note,execution,test 40863411
+2026-02-11T13:04:11,testrail,run 26442,result passed,execution,test 40863411
+2026-02-11T16:15:46,testrail,run 26442,result passed,execution,test 40863414
+2026-02-11T16:59:18,testrail,run 26442,result note,execution,test 40863414
+2026-02-11T17:12:52,testrail,run 26442,result failed,execution,test 40863431
+2026-02-11T17:16:01,testrail,run 26442,result test_in_progress,execution,test 40863457
+2026-02-11T17:24:40,jira-bug,S34-3880,opened,defect_loop,Failed test: W010 Evides particulier vkk email (wel reminder
+2026-02-11T17:24:46,testrail,run 26442,result failed,execution,test 40863430 defect S34-3880
+2026-02-11T17:32:58,jira-bug,S34-3881,opened,defect_loop,Failed test: W010 Vitens zakelijk vkk email (wel reminder F3
+2026-02-11T17:32:59,testrail,run 26442,result failed,execution,test 40863435 defect S34-3881
+2026-02-11T17:54:24,testrail,run 26442,result passed,execution,test 40863450
+2026-02-11T17:59:52,testrail,run 26442,result passed,execution,test 40863451
+2026-02-12T08:09:53,testrail,run 26442,result test_in_progress,execution,test 40863420
+2026-02-12T16:00:17,testrail,run 26442,result custom_status3,execution,test 40863459
+2026-02-13T09:11:22.065000,jira,S34-3845,status → In testing,execution,Testen verzamelklanten
+2026-02-13T09:55:23,testrail,run 26442,result passed,execution,test 40863420
+2026-02-13T10:04:47,testrail,run 26442,result failed,execution,test 40863457 defect S34-3903
+2026-02-13T10:36:25,jira-bug,S34-3903,opened,defect_loop,Failed test: Regressie W010 -> W100 Evides verzamelklant nie
+2026-02-13T12:02:01,testrail,run 26442,result failed,execution,test 40863459 defect S34-3904
+2026-02-13T12:16:51,jira-bug,S34-3904,opened,defect_loop,Failed test: Regressie W010 -> W100 Vitens verzamelklant nie
+2026-02-13T14:28:20,testrail,run 26442,result failed,execution,test 40863459
+2026-02-13T14:54:33,testrail,run 26442,result retest,execution,test 40863459
+2026-02-13T14:54:45,testrail,run 26442,result note,execution,test 40863459
+2026-02-13T14:55:01,testrail,run 26442,result retest,execution,test 40863459
+2026-02-13T14:59:47,testrail,run 26442,result retest,execution,test 40863457
+2026-02-16T10:43:50,testrail,run 26442,result failed,execution,test 40863407 defect S34-3922
+2026-02-16T14:24:04,jira-bug,S34-3914,opened,defect_loop,Aanmaanritme Evides incorrect
+2026-02-16T14:24:04.837000,jira,S34-3914,created,execution,Aanmaanritme Evides incorrect
+2026-02-16T15:35:46,testrail,run 26442,result note,execution,test 40863407
+2026-02-16T16:20:31,testrail,run 26442,result failed,execution,test 40863415 defect S34-3914
+2026-02-16T16:48:42,testrail,run 26442,result test_in_progress,execution,test 40863422
+2026-02-17T10:39:22,jira-bug,S34-3922,opened,defect_loop,Failed test: Regressie W010 -> W100 Vitens particulier incl 
+2026-02-18T11:40:30,testrail,run 26442,result passed,execution,test 40863433
+2026-02-18T12:12:12,testrail,run 26442,result passed,execution,test 40863432
+2026-02-18T14:39:38,testrail,run 26442,result retest,execution,test 40863407
+2026-02-18T14:45:51,testrail,run 26442,result passed,execution,test 40863436
+2026-02-18T14:55:35,testrail,run 26442,result passed,execution,test 40863429
+2026-02-19T11:11:55,testrail,run 26442,result note,execution,test 40863407
+2026-02-19T11:26:37,jira-bug,S34-3881,resolved,defect_loop,Failed test: W010 Vitens zakelijk vkk email (wel reminder F3
+2026-02-19T11:27:55,testrail,run 26442,result passed,execution,test 40863435
+2026-02-19T13:34:39,jira-bug,S34-3880,resolved,defect_loop,Failed test: W010 Evides particulier vkk email (wel reminder
+2026-02-19T13:42:42,testrail,run 26442,result failed,execution,test 40863435
+2026-02-19T13:53:36,testrail,run 26442,result passed,execution,test 40863434
+2026-02-19T13:56:02,jira-bug,S34-3945,opened,defect_loop,Failed test: W010 Evides particulier vkk email (wel reminder
+2026-02-19T13:56:04,testrail,run 26442,result failed,execution,test 40863430 defect S34-3945
+2026-02-19T14:01:57,testrail,run 26442,result passed,execution,test 40863435
+2026-02-19T14:04:38,jira-bug,S34-3945,resolved,defect_loop,Failed test: W010 Evides particulier vkk email (wel reminder
+2026-02-19T14:05:09,testrail,run 26442,result passed,execution,test 40863430
+2026-02-19T14:06:40,testrail,run 26442,result passed,execution,test 40863431
+2026-02-19T15:55:06,testrail,run 26442,result test_in_progress,execution,test 40863444
+2026-02-19T17:11:40,testrail,run 26442,result test_in_progress,execution,test 40863422
+2026-02-19T17:26:26,testrail,run 26442,result test_in_progress,execution,test 40863455
+2026-02-23T11:09:31,testrail,run 26442,result note,execution,test 40863457
+2026-02-23T11:09:38,testrail,run 26442,result note,execution,test 40863459
+2026-02-23T11:17:10,testrail,run 26442,result passed,execution,test 40863457
+2026-02-23T12:58:27,testrail,run 26442,result passed,execution,test 40863459
+2026-02-23T14:09:19,testrail,run 26442,result passed,execution,test 40863448
+2026-02-23T15:38:08.919000,jira,S34-3845,status → Resolved,execution,Testen verzamelklanten
+2026-02-23T15:38:52,jira-bug,S34-3903,resolved,defect_loop,Failed test: Regressie W010 -> W100 Evides verzamelklant nie
+2026-02-24T11:39:25,testrail,run 26442,result passed,execution,test 40863438
+2026-02-24T16:47:13,testrail,run 26442,result passed,execution,test 40863446
+2026-02-24T16:57:33,testrail,run 26442,result passed,execution,test 40863447
+2026-02-24T16:58:55,testrail,run 26442,result note,execution,test 40863421
+2026-02-24T16:58:55,testrail,run 26442,result note,execution,test 40863416
+2026-02-24T17:16:45,testrail,run 26442,result test_in_progress,execution,test 40863416
+2026-02-25T09:27:28,testrail,run 26442,result note,execution,test 40863455
+2026-02-25T09:27:28,testrail,run 26442,result note,execution,test 40863422
+2026-02-25T09:27:28,testrail,run 26442,result note,execution,test 40863415
+2026-02-25T10:12:40,testrail,run 26442,result passed,execution,test 40863415
+2026-02-25T15:30:52,testrail,run 26442,result passed,execution,test 40863422
+2026-02-25T15:43:42,jira-bug,S34-3914,resolved,defect_loop,Aanmaanritme Evides incorrect
+2026-02-25T15:43:42.060000,jira,S34-3914,status → Done,execution,Aanmaanritme Evides incorrect
+2026-02-25T15:44:24,jira-bug,S34-3922,resolved,defect_loop,Failed test: Regressie W010 -> W100 Vitens particulier incl 
+2026-02-25T16:48:02,testrail,run 26442,result passed,execution,test 40863421
+2026-02-26T09:39:52,testrail,run 26442,result passed,execution,test 40863455
+2026-02-26T14:14:27,testrail,run 26442,result passed,execution,test 40863416
+2026-02-26T14:22:44,testrail,run 26442,result test_in_progress,execution,test 40863444
+2026-02-26T16:19:50,testrail,run 26442,result passed,execution,test 40863406
+2026-02-27T10:43:07,testrail,run 26442,result passed,execution,test 40863444
+2026-02-27T11:14:58,testrail,run 26442,result passed,execution,test 40863407
+2026-02-27T13:17:16.790000,jira,S34-3974,created,closure,testen P2P
+2026-02-27T13:17:51.452000,jira,S34-3974,status → In Progress,closure,testen P2P
+2026-02-27T13:17:54.857000,jira,S34-3974,status → In testing,closure,testen P2P
+2026-02-27T13:18:01.225000,jira,S34-3974,status → Resolved,closure,testen P2P
+2026-03-03T13:34:05.704000,jira,S34-3575,status → Resolved,closure,Testen 1 week (incl)
+2026-03-04T09:02:58,jira-bug,S34-3904,resolved,defect_loop,Failed test: Regressie W010 -> W100 Vitens verzamelklant nie
+2026-03-05T10:18:21.439000,jira,S34-2907,status → Resolved,closure,"Dresens, Sanne [X]"
+2026-03-05T10:34:48.094000,jira,S34-3846,status → Resolved,closure,Aanpassen procesplaat naincassoproces B2

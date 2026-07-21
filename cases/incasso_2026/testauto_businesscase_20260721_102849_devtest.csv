@@ -1,0 +1,2 @@
+key,scope,issuetype,status,dev_days,test_days,ratio_test_vs_dev,backfilled,summary
+S34-2908,case_study,Story,,22.2,6.8,0.31,False,SIMPEL: W030 Nog niet oprollen
