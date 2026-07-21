@@ -46,6 +46,60 @@ SESSION_GAP_CAP_S = 60 * 60
 
 _W_CODE_RE = re.compile(r"\bW\d{3}\b")
 _REGRESSION_TITLE_RE = re.compile(r"regress|W\d{3}\s*->\s*W\d{3}", re.IGNORECASE)
+_JIRA_KEY_RE = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
+
+
+def _run_jira_keys(run: dict) -> tuple[list[str], list[str]]:
+    """Jira keys a TestRail run declares, from `refs` (authoritative) and `name`."""
+    refs = _JIRA_KEY_RE.findall(run.get("refs") or "")
+    name = [k for k in _JIRA_KEY_RE.findall(run.get("name") or "") if k not in refs]
+    return refs, name
+
+
+def resolve_story_key(run: dict, requested: str | None,
+                      allow_unlinked: bool = False) -> str:
+    """Resolve --jira against the run's own references; abort on a mismatch.
+
+    The analysis splices ONE story's Jira lifecycle onto ONE run's execution
+    data. If the two are unrelated the output is still internally consistent,
+    and therefore silently wrong — so the link is established from the data
+    rather than assumed from the CLI arguments.
+    """
+    refs, name = _run_jira_keys(run)
+    declared = refs + name
+    run_id = run.get("id")
+
+    if not requested:
+        if not declared:
+            raise SystemExit(
+                f"TestRail-run {run_id} verwijst naar geen enkele Jira-issue "
+                f"(refs en naam zijn leeg) — geef expliciet --jira KEY op, of "
+                f"--allow-unlinked om zonder Jira-koppeling door te gaan.")
+        chosen = declared[0]
+        where = "refs" if refs else "runnaam"
+        if len(declared) > 1:
+            print(f"  ℹ run {run_id} verwijst naar {', '.join(declared)} — "
+                  f"gekozen: {chosen} (eerste uit {where}); override met --jira")
+        else:
+            print(f"  ✓ koppeling uit {where}: run {run_id} → {chosen}")
+        return chosen
+
+    if requested in declared:
+        print(f"  ✓ koppeling bevestigd: run {run_id} → {requested}")
+        return requested
+
+    msg = (f"TestRail-run {run_id} verwijst niet naar {requested}. "
+           f"De run noemt: {', '.join(declared) or '(niets)'}.")
+    if allow_unlinked:
+        print(f"  ⚠️ {msg} — doorgegaan op eigen risico (--allow-unlinked); de "
+              f"waardestroom koppelt dan niet-gerelateerde data.", file=sys.stderr)
+        return requested
+    raise SystemExit(
+        f"{msg}\nDe analyse plakt de Jira-levenscyclus van één story op de "
+        f"uitvoeringsdata van één run; zonder koppeling is het resultaat wel "
+        f"consistent maar onjuist.\nGebruik --jira "
+        f"{declared[0] if declared else '<KEY>'}, of --allow-unlinked als je "
+        f"zeker weet dat de koppeling klopt.")
 
 # ── clients ──────────────────────────────────────────────────────────────────
 
@@ -1233,9 +1287,24 @@ def render_report_md(report: dict) -> str:
         L.append("|---|---|")
         exec_step = next((s for s in vs0["steps"]
                           if s["step"] == "Testuitvoering"), {})
+        # Alles hieronder wordt afgeleid; alleen expliciet gelabelde aannames
+        # zijn dat niet. Hardcoded cijfers uit één run maakten dit blok
+        # onbruikbaar voor elke andere story.
+        n_testers = ep0["testers"]
+        first, last = rm.get("first_result"), rm.get("last_result")
+        win_wd = (_workdays(_dt(first), _dt(last)) if first and last else 0.0)
+        window = (f"**{win_wd / 5:.0f} weken** ({win_wd:.0f} werkdagen)"
+                  if win_wd >= 10 else f"**{win_wd:.0f} werkdagen**")
+        n_cases = (corpus or {}).get("cases_regression_titled") or 0
+        bands = roi["assumptions"].get("build_hours_per_case_bands") or [2, 4, 8]
+        build = (f"eenmalig **{n_cases * bands[1] / 8:.0f}–"
+                 f"{n_cases * bands[-1] / 8:.0f} dagen** bouwen "
+                 f"({n_cases} testgevallen)" if n_cases else
+                 "eenmalig **bouwen** (aantal testgevallen onbekend)")
+
         L.append(f"| Wat kost één handmatige regressieronde? | "
                  f"**{testdagen:.0f} persoonstestdagen** inzet, verspreid over "
-                 f"**5 weken** (25 werkdagen) testvenster |")
+                 f"{window} testvenster |")
         L.append(f"| Hoeveel daarvan ligt het stil? | "
                  f"**{exec_step.get('wait_days', 0):.0f} werkdagen** binnen het "
                  f"testvenster zonder enige testactiviteit (wachten op "
@@ -1246,15 +1315,24 @@ def render_report_md(report: dict) -> str:
                  f"{t0['flow_efficiency_pct']}% (zie §6b) |")
         L.append("| Hoe vaak willen we een ronde? | elke week, of minimaal elke "
                  "sprint (3 weken) — nodig voor de incasso-refactoring |")
-        L.append("| Kan dat handmatig? | Nee. Eén ronde beslaat 5 weken en ±1 "
-                 "tester; wekelijks is fysiek onmogelijk |")
-        L.append("| Wat kost automatiseren? | eenmalig **40–80 dagen** bouwen "
-                 "(80 testgevallen) + onderhoud bij proceswijzigingen |")
-        L.append(f"| Wat levert het per ronde op? | ±13 testdagen bespaard en "
-                 f"doorlooptijd terug naar **{a0['lead_time_days']:.0f} "
-                 f"werkdagen** |")
-        L.append("| Wanneer terugverdiend? | na **±5 rondes** — bij wekelijks "
-                 "draaien binnen een kwartaal |")
+        # Ook het oordeel zelf moet uit de meting volgen: een ronde die binnen
+        # een week past, kán wekelijks — dan is de vraag of hij de volledige
+        # regressie dekt, niet of hij past.
+        if 0 < win_wd <= 5:
+            verdict = (f"Deze ronde wél ({window}, {n_testers} tester(s)) — maar "
+                       f"hij dekt {rm['tests']} testgevallen, geen volledige "
+                       f"regressie van het proces")
+        else:
+            verdict = (f"Nee. Eén ronde beslaat {window} en {n_testers} "
+                       f"tester(s); wekelijks is fysiek onmogelijk")
+        L.append(f"| Kan dat handmatig? | {verdict} |")
+        L.append(f"| Wat kost automatiseren? | {build} + onderhoud bij "
+                 f"proceswijzigingen |")
+        L.append(f"| Wat levert het per ronde op? | doorlooptijd terug naar "
+                 f"**{a0['lead_time_days']:.0f} werkdagen**; bespaarde testdagen "
+                 f"is een aanname (zie §5) |")
+        L.append("| Wanneer terugverdiend? | zie de terugverdientabel in §5 — "
+                 "afhankelijk van de gekozen cadans |")
         L.append("")
         L.append("**Conclusie:** dit is geen besparingscase op bestaande uren "
                  "(die worden nauwelijks gemaakt), maar een **enabler-case**: "
@@ -1604,10 +1682,14 @@ def write_outputs(report: dict, out_dir: Path) -> list[Path]:
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Extract Jira/TestRail data for a test-automation business case.")
-    ap.add_argument("--jira", required=True, metavar="KEY",
-                    help="Jira story key, e.g. S34-2907")
+    ap.add_argument("--jira", default=None, metavar="KEY",
+                    help="Jira story key, e.g. S34-2907 (default: afgeleid uit "
+                         "de refs/naam van de TestRail-run)")
     ap.add_argument("--run", required=True, type=int, metavar="ID",
                     help="TestRail run id, e.g. 26442")
+    ap.add_argument("--allow-unlinked", action="store_true",
+                    help="Ga door ook als de run niet naar de opgegeven Jira-issue "
+                         "verwijst (levert een consistent maar onjuist rapport op)")
     ap.add_argument("--suite", type=int, default=None,
                     help="TestRail suite id (default: from the run)")
     ap.add_argument("--project", type=int, default=None,
@@ -1638,8 +1720,24 @@ def main() -> None:
     tr = TestRailClient(creds)
     report: dict = {"generated": datetime.now().isoformat(timespec="seconds")}
 
-    print(f"→ Jira lifecycle {args.jira} …")
-    report["jira_lifecycle"] = build_jira_lifecycle(jira, args.jira)
+    # Establish the Jira↔TestRail link BEFORE anything is analysed: every
+    # downstream figure (value stream, dev:test ratio) assumes the story and the
+    # run describe the same piece of work.
+    print(f"→ Koppeling controleren (run {args.run}) …")
+    run_head = tr.get(f"get_run/{args.run}")
+    story_key = resolve_story_key(run_head, args.jira, args.allow_unlinked)
+    refs, name_keys = _run_jira_keys(run_head)
+    report["source_link"] = {
+        "run_id": args.run,
+        "story_key": story_key,
+        "run_refs": refs,
+        "keys_in_run_name": name_keys,
+        "linked": story_key in (refs + name_keys),
+        "allow_unlinked": bool(args.allow_unlinked),
+    }
+
+    print(f"→ Jira lifecycle {story_key} …")
+    report["jira_lifecycle"] = build_jira_lifecycle(jira, story_key)
 
     print(f"→ TestRail run {args.run} …")
     report["testrail_run"] = build_run_metrics(tr, jira, args.run)

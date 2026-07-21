@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Inches, Pt
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import deck_content as dc  # noqa: E402 — naast dit script
 
 _OUT = Path("output")  # relatief aan de werkdirectory
 
@@ -203,15 +207,11 @@ def _vsm_row(d: Deck, s, y, steps, *, label, active_key="active_days",
             x += gap
 
 
-def build(data: dict, out_path: Path) -> int:
+def build(data: dict, content: dict[str, str], f: dict, out_path: Path) -> int:
+    """Render het deck. Elk stukje tekst komt uit `content`, elk getal uit `f`."""
     vs = data["value_stream"]
-    tot = vs["totals"]
     auto = vs["automated_scenario"]
-    rm = data["testrail_run"]
-    ep = rm["effort_proxy"]
-    testdagen = sum(v["active_days"] for v in ep["per_tester"].values())
-    per_tester = sorted(ep["per_tester"].values(), key=lambda v: -v["results"])
-    tot_res = sum(v["results"] for v in per_tester)
+    C = lambda k: content.get(k, "")          # noqa: E731 — korte lookup
     d = Deck()
 
     # 1. titel
@@ -223,71 +223,44 @@ def build(data: dict, out_path: Path) -> int:
     tf = d.box(s, Inches(0.8), Inches(2.4), Inches(11.7), Inches(2.6))
     p = tf.paragraphs[0]
     r = p.add_run()
-    r.text = "Regressietesten automatiseren — incassoproces"
+    r.text = C("titel.kop")
     r.font.size = Pt(40)
     r.font.bold = True
     r.font.color.rgb = WHITE
     p2 = tf.add_paragraph()
     r2 = p2.add_run()
-    r2.text = "Beslisvoorstel, onderbouwd met gemeten test- en Jira-data"
+    r2.text = C("titel.sub")
     r2.font.size = Pt(22)
     r2.font.color.rgb = ACCENT
     p3 = tf.add_paragraph()
     r3 = p3.add_run()
-    r3.text = (f"Gemeten: één complete regressieronde (jan–feb 2026) + 3 jaar "
-               f"testhistorie · {date.today().strftime('%d-%m-%Y')}")
+    r3.text = f"{C('titel.voet')} · {date.today().strftime('%d-%m-%Y')}"
     r3.font.size = Pt(14)
     r3.font.color.rgb = RGBColor(0xBF, 0xDC, 0xF5)
 
     # 2. de situatie
     s = d.slide()
-    d.title(s, "De situatie")
+    d.title(s, C("situatie.kop"))
     tf = d.box(s, Inches(0.7), Inches(1.6), Inches(12.0), Inches(5.4))
-    d.bullets(tf, [
-        (0, "We gaan het incassoproces vernieuwen en vereenvoudigen.", True),
-        (1, "Om veilig te kunnen wijzigen willen we elke week (of elke sprint) "
-            "een volledige regressietest draaien.", False),
-        (0, "Eén handmatige regressieronde duurt 5 weken en houdt één tester "
-            "bezig.", True),
-        (1, "Gemeten aan de laatste complete ronde (35 testgevallen, "
-            "jan–feb 2026).", False),
-        (0, "Wekelijks handmatig testen kan dus simpelweg niet.", True),
-        (1, "In de praktijk gebeurt het ook niet: de afgelopen 3 jaar zijn er per "
-            "jaar maar een handvol regressietests echt uitgevoerd.", False),
-        (1, "Van de 2.868 testgevallen is er vandaag 1 geautomatiseerd.", False),
-    ], size=22)
+    d.bullets(tf, dc.bullets(C("situatie.bullets")), size=22)
 
     # 3. tijdlijn (waardestroom) — nu vs straks
     s = d.slide()
-    d.title(s, "Tijdlijn: waar gaat de tijd heen?",
-            "Blauw = werk · rood klokje = wachten · alles in werkdagen")
-    _vsm_row(d, s, Inches(1.55), vs["steps"],
-             label="NU — handmatig testen")
-    _vsm_row(d, s, Inches(4.15), auto["steps"],
-             label="STRAKS — met geautomatiseerde regressie")
+    d.title(s, C("tijdlijn.kop"), C("tijdlijn.sub"))
+    _vsm_row(d, s, Inches(1.55), vs["steps"], label=C("tijdlijn.nu"))
+    _vsm_row(d, s, Inches(4.15), auto["steps"], label=C("tijdlijn.straks"))
     tf = d.box(s, Inches(0.6), Inches(6.35), Inches(12.2), Inches(1.0))
-    d.bullets(tf, [
-        (0, f"Nu: {_r(tot['lead_time_days'])} werkdagen van bouw tot oplevering — "
-            f"{_r(tot['wait_days'])} daarvan is wachten. "
-            f"Straks: {_r(auto['lead_time_days'])} werkdagen.", True),
-        (0, "De grootste winst zit in de testuitvoering en de hertestlus: van "
-            "dagen wachten naar uren.", False),
-    ], size=16)
+    d.bullets(tf, dc.bullets(C("tijdlijn.bullets")), size=16)
 
     # 4. wat kost één ronde nu
     s = d.slide()
-    d.title(s, "Wat kost één handmatige regressieronde?",
-            f"Gemeten: {rm['tests']} testgevallen, {rm['results']} uitvoeringen, "
-            f"jan–feb 2026")
+    d.title(s, C("ronde.kop"), C("ronde.sub"))
     xs = [Inches(0.5), Inches(3.75), Inches(7.0), Inches(10.25)]
     cw = Inches(3.0)
-    d.kpi(s, xs[0], Inches(1.45), cw, "5 weken", "doorlooptijd (25 werkdagen)")
-    d.kpi(s, xs[1], Inches(1.45), cw, f"{_r(testdagen)} testdagen",
-          "totale inzet — ≈ 1 tester, 5 weken lang")
-    d.kpi(s, xs[2], Inches(1.45), cw, "8 werkdagen",
-          "alles stil: wachten op bugfixes", RED)
-    d.kpi(s, xs[3], Inches(1.45), cw, f"{len(rm['defects'])} bugs",
-          "gevonden; elke bug kost ±2 weken extra", RED)
+    for i, (key, colour) in enumerate([("ronde.kpi1", DARK), ("ronde.kpi2", DARK),
+                                       ("ronde.kpi3", RED), ("ronde.kpi4", RED)]):
+        value, _, label = C(key).partition("|")
+        d.kpi(s, xs[i], Inches(1.45), cw, value.strip(), label.strip(), colour)
     tf = d.box(s, Inches(0.7), Inches(3.5), Inches(5.8), Inches(0.5))
     p = tf.paragraphs[0]
     r = p.add_run()
@@ -295,97 +268,44 @@ def build(data: dict, out_path: Path) -> int:
     r.font.size = Pt(18)
     r.font.bold = True
     r.font.color.rgb = DARK
-    labels = ["A", "B", "C", "D"]
-    rows = [["Tester", "Testdagen", "Aandeel"]]
-    for lbl, v in zip(labels, per_tester[:2]):
-        rows.append([lbl, v["active_days"],
-                     f"{_r(100 * v['results'] / tot_res)}% van de uitvoeringen"])
-    rest = per_tester[2:]
-    if rest:
-        rows.append(["C + D", sum(v["active_days"] for v in rest),
-                     f"{_r(100 * sum(v['results'] for v in rest) / tot_res)}%"])
-    d.table(s, Inches(0.7), Inches(4.1), Inches(5.8), rows,
+    d.table(s, Inches(0.7), Inches(4.1), Inches(5.8), f["tester_table"],
             col_w=[1, 1, 2.4], size=15)
     tf = d.box(s, Inches(7.0), Inches(4.1), Inches(5.8), Inches(2.8))
-    d.bullets(tf, [
-        (0, "Geen team van 4: twee mensen deden 95% van het werk.", True),
-        (0, f"Elke test is gemiddeld {_r(rm['executions_per_test']['mean'])}× "
-            f"uitgevoerd (falen → bugfix → opnieuw).", False),
-        (0, "Testen op zich is snel; het meeste van de 5 weken is wachten en "
-            "coördineren.", False),
-    ], size=17)
+    d.bullets(tf, dc.bullets(C("ronde.bullets")), size=17)
 
     # 5. de rekensom
     s = d.slide()
-    d.title(s, "De rekensom op één A4",
-            "Alles in testdagen — details en aannames in de bijlage")
+    d.title(s, C("rekensom.kop"), C("rekensom.sub"))
     d.table(s, Inches(0.7), Inches(1.5), Inches(11.9),
-            [["", "Vraag", "Antwoord"],
-             ["1", "Wat kost één ronde handmatig?",
-              "±13 testdagen werk (bandbreedte 7–26) en 5 weken doorlooptijd"],
-             ["2", "Hoe vaak willen we een ronde?",
-              "elke week — of minimaal elke sprint (3 weken)"],
-             ["3", "Wat kost automatiseren (eenmalig)?",
-              "40–80 dagen bouwen (80 testgevallen), plus bijhouden bij "
-              "proceswijzigingen"],
-             ["4", "Wat levert elke ronde dan op?",
-              "±13 testdagen bespaard, en de uitslag in uren i.p.v. weken"],
-             ["5", "Wanneer terugverdiend?",
-              "na ±5 rondes — bij wekelijks draaien: binnen een kwartaal"]],
+            [["", "Vraag", "Antwoord"]] + dc.pipe_rows(C("rekensom.rows")),
             col_w=[0.4, 3.6, 7.9], size=16)
-    d.kpi(s, Inches(0.7), Inches(4.8), Inches(5.8), "binnen 1 kwartaal",
-          "terugverdiend bij wekelijks draaien", GREEN, h=1.4)
-    d.kpi(s, Inches(7.0), Inches(4.8), Inches(5.8), "1 tester vrijgespeeld",
-          "elke ronde — voor het verbeterwerk zelf", GREEN, h=1.4)
+    for x, key in ((Inches(0.7), "rekensom.kpi1"), (Inches(7.0), "rekensom.kpi2")):
+        value, _, label = C(key).partition("|")
+        d.kpi(s, x, Inches(4.8), Inches(5.8), value.strip(), label.strip(),
+              GREEN, h=1.4)
     tf = d.box(s, Inches(0.7), Inches(6.5), Inches(12.0), Inches(0.7))
     p = tf.paragraphs[0]
     r = p.add_run()
-    r.text = ("Let op: automatiseren van alléén de huidige praktijk loont niet — er "
-              "wordt nu nauwelijks geregresseerd. De winst zit in wat het mogelijk "
-              "maakt.")
+    r.text = C("rekensom.voet")
     r.font.size = Pt(14)
     r.font.italic = True
     r.font.color.rgb = GREY
 
     # 6. waarom nu
     s = d.slide()
-    d.title(s, "Waarom nu beslissen?")
+    d.title(s, C("waarom.kop"))
     tf = d.box(s, Inches(0.7), Inches(1.6), Inches(12.0), Inches(5.4))
-    d.bullets(tf, [
-        (0, "Het proces wijzigt continu — en juist dan is een vangnet nodig.", True),
-        (1, "Per jaar draaien er 300 tot 1.100 tests voor wijzigingen; een "
-            "regressie-vangnet daaromheen ontbreekt.", False),
-        (0, "Bugs zijn nu traag en duur.", True),
-        (1, "Elke gevonden bug kost ±2 weken: ±1 week repareren, ±1 week wachten "
-            "op hertest. Geautomatiseerd is de hertest er binnen een dag.", False),
-        (0, "De laatste regressieronde dekte niet alles.", True),
-        (1, "5 van de 11 processtappen (W050, W070, W080, W085, W090) zaten er "
-            "niet in — het vangnet heeft nu al gaten.", False),
-        (0, "De drukste stappen zijn bekend: W010, W040 en W100.", True),
-        (1, "Daar zitten de meeste wijzigingen én alle recente bugs — dáár begint "
-            "de pilot.", False),
-    ], size=20)
+    d.bullets(tf, dc.bullets(C("waarom.bullets")), size=20)
 
     # 7. gevraagd besluit
     s = d.slide()
-    d.title(s, "Gevraagd besluit")
+    d.title(s, C("besluit.kop"))
     tf = d.box(s, Inches(0.7), Inches(1.6), Inches(12.0), Inches(4.6))
-    d.bullets(tf, [
-        (0, "1.  Start een automatiseringspilot op de drie drukste processtappen "
-            "(W010, W040, W100).", True),
-        (1, "Meet in de pilot de echte bouw- en onderhoudsdagen — dat vervangt de "
-            "aannames in de rekensom.", False),
-        (0, "2.  Kies de testcadans: elke week of elke sprint.", True),
-        (1, "Dit bepaalt de terugverdientijd (kwartaal vs. jaar).", False),
-        (0, "3.  Registreer voortaan de testtijd in TestRail.", True),
-        (1, "Kost niets, en maakt de volgende beslissing meetbaar in plaats van "
-            "geschat.", False),
-    ], size=20)
+    d.bullets(tf, dc.bullets(C("besluit.bullets")), size=20)
     tf = d.box(s, Inches(0.7), Inches(6.7), Inches(12.0), Inches(0.5))
     p = tf.paragraphs[0]
     r = p.add_run()
-    r.text = ("Bijlage beschikbaar: volledige data-analyse (rapport + cijfers), "
-              "reproduceerbaar uit Jira en TestRail.")
+    r.text = C("besluit.voet")
     r.font.size = Pt(12)
     r.font.color.rgb = GREY
 
@@ -396,6 +316,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--json", default=None,
                     help="Analyse-JSON (default: nieuwste in output/)")
+    ap.add_argument("--content", default=None,
+                    help="Bewerkt deck_content.md; zonder deze vlag wordt de "
+                         "tekst rechtstreeks uit de JSON afgeleid")
+    ap.add_argument("--emit-content", action="store_true",
+                    help="Schrijf deck_content.md en stop (checkpoint om te "
+                         "bewerken vóór het renderen)")
     ap.add_argument("--out", default=str(_OUT / "testauto_businesscase_mgmt.pptx"))
     args = ap.parse_args()
 
@@ -408,8 +334,25 @@ def main() -> None:
     if "value_stream" not in data:
         raise SystemExit(f"{path} bevat geen value_stream — draai eerst "
                          f"scripts/testauto_businesscase.py opnieuw.")
-    n = build(data, Path(args.out))
-    print(f"✓ {args.out} — {n} slides (bron: {Path(path).name})")
+
+    f = dc.facts(data)
+    if args.emit_content:
+        out = _OUT / "deck_content.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(dc.to_md(dc.default_content(f), f), encoding="utf-8")
+        print(f"✓ {out} — bewerk en render met --content {out}")
+        return
+
+    if args.content:
+        content = dc.parse_md(Path(args.content).read_text(encoding="utf-8"))
+        src = f"tekst: {Path(args.content).name}"
+    else:
+        content = dc.default_content(f)
+        src = "tekst: afgeleid uit JSON"
+
+    n = build(data, content, f, Path(args.out))
+    print(f"✓ {args.out} — {n} slides "
+          f"(data: {Path(path).name} · {src} · {f['story_key']}/run {f['run_id']})")
 
 
 if __name__ == "__main__":
