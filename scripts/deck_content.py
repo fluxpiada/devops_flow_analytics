@@ -47,13 +47,22 @@ def _period_label(first: str | None, last: str | None) -> str:
     return f"{ma}–{mb} {b.year}" if ma != mb else f"{ma} {b.year}"
 
 
-def _workdays(a: datetime, b: datetime) -> float:
+def _workday_span(a: datetime, b: datetime) -> float:
+    """Aantal werkdagen (ma–vr) dat het venster [a, b] beslaat, beide einddagen
+    meegeteld. Bewust een KALENDER-telling voor het tijdlijnlabel, NIET de
+    fractionele actieve-werkdag-maat van de engine (_workdays daar) — vandaar
+    een eigen naam."""
     days, cur = 0, a.date()
     while cur <= b.date():
         if cur.weekday() < 5:
             days += 1
         cur = date.fromordinal(cur.toordinal() + 1)
     return float(days)
+
+
+def _rows_to_pipe(rows: list[list]) -> str:
+    """Tabelrijen (lijst-van-lijsten) → pipe-tekst voor het checkpoint."""
+    return "\n".join("|".join(str(c) for c in row) for row in rows)
 
 
 def _clean_step(name: str) -> str:
@@ -102,12 +111,15 @@ def facts(data: dict) -> dict:
 
     per_tester = sorted(ep["per_tester"].values(), key=lambda v: -v["results"])
     tot_res = sum(v["results"] for v in per_tester) or 1
-    testdagen = sum(v["active_days"] for v in per_tester)
+    # active_test_days wordt door de engine afgeleid; oudere JSONs missen het.
+    testdagen = ep.get("active_test_days")
+    if testdagen is None:
+        testdagen = sum(v["active_days"] for v in per_tester)
 
     window_wd = 0.0
     if rm.get("first_result") and rm.get("last_result"):
-        window_wd = _workdays(datetime.fromisoformat(rm["first_result"]),
-                              datetime.fromisoformat(rm["last_result"]))
+        window_wd = _workday_span(datetime.fromisoformat(rm["first_result"]),
+                                  datetime.fromisoformat(rm["last_result"]))
 
     exec_step = next((s for s in vs["steps"] if s["step"] == "Testuitvoering"), {})
 
@@ -268,6 +280,9 @@ def default_content(f: dict) -> dict[str, str]:
                        + (f"; gemiddeld {f['defect_days']} dagen open"
                           if f["defect_days"] else "")),
         "ronde.tabelkop": "Werkverdeling (geanonimiseerd):",
+        # De werkverdelingstabel als bewerkbare pipe-rijen (kop + testers), zodat
+        # óók deze cijfers via het checkpoint lopen i.p.v. live uit de JSON.
+        "ronde.tabel": _rows_to_pipe(f["tester_table"]),
         "ronde.bullets":
             f"- **{f['split_sentence']}**\n"
             f"- Elke test is gemiddeld {f['exec_per_test']}× uitgevoerd "

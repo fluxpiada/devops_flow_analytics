@@ -52,9 +52,19 @@ _CREDS_CANDIDATES = (
 # treated as a break/new session, not hands-on time on one test.
 SESSION_GAP_CAP_S = 60 * 60
 
-_W_CODE_RE = re.compile(r"\bW\d{3}\b")
 _REGRESSION_TITLE_RE = re.compile(r"regress|W\d{3}\s*->\s*W\d{3}", re.IGNORECASE)
 _JIRA_KEY_RE = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")
+_W_CODE_RE = re.compile(r"\bW\d{2,3}\b")
+
+# TestRail-systeemstatussen (get_statuses-ids: 1=passed … 5=failed).
+TR_PASSED, TR_BLOCKED, TR_UNTESTED, TR_RETEST, TR_FAILED = 1, 2, 3, 4, 5
+# Een her-uitvoering ná een van deze uitkomsten is defect-gedreven hertest.
+_TR_AFTER_FAIL = frozenset({TR_BLOCKED, TR_RETEST, TR_FAILED})
+
+
+def _w_codes(text: str | None) -> set[str]:
+    """W-codes uit een titel/samenvatting, genormaliseerd (W70 → W070)."""
+    return {f"W{int(c[1:]):03d}" for c in _W_CODE_RE.findall(text or "")}
 
 # Jira-workflowstatussen die de dev- en testfase markeren. Een andere workflow
 # gebruikt andere namen — override met --status-dev / --status-test; zonder de
@@ -353,10 +363,11 @@ def _session_gap_effort(results: list[dict]) -> dict:
     return {
         "per_tester": per_tester,
         "testers": len(by_tester),
+        # Persoonstestdagen: som van de actieve dagen over alle testers. Eén keer
+        # afgeleid hier zodat waardestroom, §0 en het deck dezelfde waarde lezen.
+        "active_test_days": sum(v["active_days"] for v in per_tester.values()),
         "pooled_median_gap_min": (round(statistics.median(gaps_all) / 60, 1)
                                   if gaps_all else None),
-        "pooled_mean_gap_min": (round(statistics.mean(gaps_all) / 60, 1)
-                                if gaps_all else None),
         "net_active_hours": round(sum(gaps_all) / 3600, 2),
     }
 
@@ -371,9 +382,6 @@ def build_run_metrics(tr: TestRailClient, jira: JiraClient, run_id: int) -> dict
                               if isinstance(statuses, dict) else statuses)}
 
     per_test = Counter(r["test_id"] for r in results)
-    execs = sorted(per_test.values())
-    result_status = Counter(status_names.get(r["status_id"], str(r["status_id"]))
-                            for r in results if r.get("status_id"))
 
     # First-pass rate: earliest meaningful-status result per test is 'passed'.
     first_status: dict[int, str] = {}
@@ -383,14 +391,14 @@ def build_run_metrics(tr: TestRailClient, jira: JiraClient, run_id: int) -> dict
     first_pass = sum(1 for s in first_status.values() if s == "passed")
 
     # Per-W-code subject breakdown (a test spanning W010->W100 counts for both).
-    test_codes = {t["id"]: _W_CODE_RE.findall(t.get("title") or "") for t in tests}
+    test_codes = {t["id"]: _w_codes(t.get("title")) for t in tests}
     w_codes: dict[str, dict] = defaultdict(lambda: {"tests": 0, "executions": 0,
                                                     "failed": 0, "defects": set()})
     for t in tests:
-        for code in set(test_codes[t["id"]]):
+        for code in test_codes[t["id"]]:
             w_codes[code]["tests"] += 1
     for r in results:
-        for code in set(test_codes.get(r["test_id"], [])):
+        for code in test_codes.get(r["test_id"], set()):
             w_codes[code]["executions"] += 1
             if status_names.get(r.get("status_id")) == "failed":
                 w_codes[code]["failed"] += 1
@@ -401,12 +409,14 @@ def build_run_metrics(tr: TestRailClient, jira: JiraClient, run_id: int) -> dict
     defect_keys = sorted({d for r in results
                           for d in re.split(r"[,\s]+", r.get("defects") or "") if d})
     defects = []
+    defect_issues: list[dict] = []  # raw issues (incl. changelog) reused by dev:test
     if defect_keys:
         try:
-            issues = jira.search(f"issuekey in ({','.join(defect_keys)})",
-                                 "summary,issuetype,status,created,resolutiondate,assignee",
-                                 max_results=len(defect_keys) + 5)
-            for i in issues:
+            defect_issues = jira.search(
+                f"issuekey in ({','.join(defect_keys)})",
+                "summary,issuetype,status,created,resolutiondate,assignee",
+                max_results=len(defect_keys) + 5, expand="changelog")
+            for i in defect_issues:
                 fi = i["fields"]
                 res_days = None
                 if fi.get("resolutiondate"):
@@ -438,10 +448,8 @@ def build_run_metrics(tr: TestRailClient, jira: JiraClient, run_id: int) -> dict
         "results": len(results),
         "executions_per_test": {
             "mean": round(len(results) / max(len(per_test), 1), 1),
-            "median": execs[len(execs) // 2] if execs else 0,
-            "max": execs[-1] if execs else 0,
+            "max": max(per_test.values()) if per_test else 0,
         },
-        "result_status_spread": dict(result_status),
         "first_pass_rate": round(first_pass / max(len(first_status), 1), 2),
         "first_result": result_dates[0].isoformat() if result_dates else None,
         "last_result": result_dates[-1].isoformat() if result_dates else None,
@@ -457,6 +465,7 @@ def build_run_metrics(tr: TestRailClient, jira: JiraClient, run_id: int) -> dict
         },
         "_results_raw": results,       # consumed by the timeline builder, not exported
         "_status_names": status_names,
+        "_defect_issues_raw": defect_issues,   # reused by build_dev_test_ratio
     }
 
 
@@ -612,17 +621,17 @@ def build_defacto_regression(raw: dict, recurrence_min: int = 3) -> dict:
 
     appearances: dict[int, list[dict]] = defaultdict(list)
     for run in ordered:
-        year = (datetime.fromtimestamp(run["created_on"]).year
-                if run.get("created_on") else None)
+        created = run.get("created_on")
+        run_dt = datetime.fromtimestamp(created) if created else None
         for t in raw.get("tests_by_run", {}).get(str(run["id"]), []):
-            if t.get("status_id") == 3 or not t.get("case_id"):
+            if t.get("status_id") == TR_UNTESTED or not t.get("case_id"):
                 continue  # untested = intent, not execution
             appearances[t["case_id"]].append({
-                "run_id": run["id"], "year": str(year),
+                "run_id": run["id"],
+                "year": str(run_dt.year if run_dt else None),
                 "status_id": t.get("status_id"), "title": t.get("title"),
                 "refs": t.get("refs"), "milestone_id": run.get("milestone_id"),
-                "date": (datetime.fromtimestamp(run["created_on"]).date()
-                         .isoformat() if run.get("created_on") else None),
+                "date": run_dt.date().isoformat() if run_dt else None,
             })
 
     pass_rerun_by_year: Counter = Counter()
@@ -634,18 +643,17 @@ def build_defacto_regression(raw: dict, recurrence_min: int = 3) -> dict:
         prev_status = None
         for app in apps:
             if prev_status is not None:
-                if prev_status == 1:            # passed
+                if prev_status == TR_PASSED:
                     pass_reruns += 1
                     pass_rerun_by_year[app["year"]] += 1
-                elif prev_status in (2, 4, 5):  # blocked / retest / failed
+                elif prev_status in _TR_AFTER_FAIL:
                     retests += 1
                     retest_by_year[app["year"]] += 1
                 else:                           # custom status: don't misfile
                     unknown_status += 1
             prev_status = app["status_id"]
         title = apps[-1]["title"] or (case_meta.get(case_id) or {}).get("title") or ""
-        w_codes = sorted({f"W{int(c[1:]):03d}"
-                          for c in re.findall(r"\bW\d{2,3}\b", title)})
+        w_codes = sorted(_w_codes(title))
         milestones = {a["milestone_id"] for a in apps if a["milestone_id"]}
         refs_seen: set[str] = set()
         for a in apps:
@@ -668,11 +676,6 @@ def build_defacto_regression(raw: dict, recurrence_min: int = 3) -> dict:
 
     defacto = sorted((c for c in per_case if c["pass_reruns"] >= 1),
                      key=lambda c: (-c["pass_reruns"], -c["runs_seen"]))
-    defacto_ids = {c["case_id"] for c in defacto}
-    defacto_exec_by_year: Counter = Counter()
-    for case_id in defacto_ids:
-        for app in appearances[case_id]:
-            defacto_exec_by_year[app["year"]] += 1
 
     return {
         "recurrence_min": recurrence_min,
@@ -684,8 +687,6 @@ def build_defacto_regression(raw: dict, recurrence_min: int = 3) -> dict:
                                       if c["titled_regression"]),
         "pass_rerun_executions_by_year": dict(sorted(pass_rerun_by_year.items())),
         "retest_executions_by_year": dict(sorted(retest_by_year.items())),
-        "defacto_case_executions_by_year": dict(sorted(
-            defacto_exec_by_year.items())),
         "unknown_status_executions": unknown_status,
         "plans_count": raw.get("plans_count"),
         "top_cases": defacto[:20],
@@ -704,14 +705,14 @@ def _analyse_corpus(raw: dict, recurrence_min: int = 3) -> dict:
             regr = regr_exec = 0
         else:
             total = len(tests)
-            # status_id 3 = TestRail system status 'untested'; a test still on
-            # it was instantiated but never run — count executions, not intent.
-            executed = sum(1 for t in tests if t.get("status_id") != 3)
+            # A test still on TR_UNTESTED was instantiated but never run —
+            # count executions, not intent.
+            executed = sum(1 for t in tests if t.get("status_id") != TR_UNTESTED)
             regr = regr_exec = 0
             for t in tests:
                 if _REGRESSION_TITLE_RE.search(t.get("title") or ""):
                     regr += 1
-                    if t.get("status_id") != 3:
+                    if t.get("status_id") != TR_UNTESTED:
                         regr_exec += 1
         per_run.append({
             "run_id": run["id"],
@@ -730,7 +731,7 @@ def _analyse_corpus(raw: dict, recurrence_min: int = 3) -> dict:
 
     by_year: dict[int, dict] = defaultdict(lambda: {
         "runs": 0, "tests": 0, "tests_executed": 0,
-        "regr_runs": 0, "regr_tests": 0, "regr_executed": 0})
+        "regr_runs": 0, "regr_executed": 0})
     for r in per_run:
         y = by_year[r["year"]]
         y["runs"] += 1
@@ -738,7 +739,6 @@ def _analyse_corpus(raw: dict, recurrence_min: int = 3) -> dict:
         y["tests_executed"] += r["tests_executed"]
         if r["is_regression"]:
             y["regr_runs"] += 1
-            y["regr_tests"] += r["regression_tests"]
             y["regr_executed"] += r["regression_executed"]
 
     cases = raw.get("cases") or []
@@ -748,8 +748,8 @@ def _analyse_corpus(raw: dict, recurrence_min: int = 3) -> dict:
     # W-step inventory over ALL case titles (normalise W70 → W070).
     w_step_cases: Counter = Counter()
     for c_ in cases:
-        for code in re.findall(r"\bW\d{2,3}\b", c_.get("title") or ""):
-            w_step_cases[f"W{int(code[1:]):03d}"] += 1
+        for code in _w_codes(c_.get("title")):
+            w_step_cases[code] += 1
 
     return {
         "w_step_cases": dict(w_step_cases.most_common()),
@@ -795,7 +795,7 @@ def build_corpus(tr: TestRailClient, project_id: int, suite_id: int,
 
 
 def build_change_pressure(jira: JiraClient, corpus: dict | None, run_metrics: dict,
-                          projects: str = "S34, KFDO") -> dict:
+                          projects: str) -> dict:
     """How often each incasso W-step is touched by change (stories/bugs) —
     the driver for regression-suite maintenance (tweak + re-test per change)."""
     inventory = (corpus or {}).get("w_step_cases") or {}
@@ -824,8 +824,7 @@ def build_change_pressure(jira: JiraClient, corpus: dict | None, run_metrics: di
             fi = i["fields"]
             year = str(fi["created"][:4])
             itype = fi["issuetype"]["name"].strip()
-            for code in {f"W{int(c[1:]):03d}"
-                         for c in re.findall(r"\bW\d{2,3}\b", fi["summary"])}:
+            for code in _w_codes(fi["summary"]):
                 if code not in per_step:
                     continue
                 st = per_step[code]
@@ -865,9 +864,7 @@ _BACKFILL_THRESHOLD_D = 0.04  # ≈1 h: all transitions inside this = admin back
 
 
 def _phase_days(tis: dict) -> tuple[float, float]:
-    dev = sum(v for k, v in tis.items() if k == STATUS_DEV)
-    test = sum(v for k, v in tis.items() if k == STATUS_TEST)
-    return round(dev, 1), round(test, 1)
+    return round(tis.get(STATUS_DEV, 0), 1), round(tis.get(STATUS_TEST, 0), 1)
 
 
 def build_dev_test_ratio(jira: JiraClient, lifecycle: dict,
@@ -881,41 +878,34 @@ def build_dev_test_ratio(jira: JiraClient, lifecycle: dict,
     be evidenced by the Jira status ("In testing") OR by TestRail runs that
     reference the key — stories often skip the Jira test status while the
     testing demonstrably happened in TestRail."""
-    entries = []
+    entries: list[dict] = []
+    epic_children: list[dict] = []
 
-    def add_entry(key, itype, summary, transitions, tis, created, resolved):
+    def add_entry(key, itype, summary, transitions, tis, *,
+                  status=None, target=None):
         dev, test = _phase_days(tis)
-        span = ((_dt(resolved) - _dt(created)).total_seconds() / 86400
-                if created and resolved else None)
         backfilled = bool(transitions) and (
             (_dt(transitions[-1]["ts"]) - _dt(transitions[0]["ts"]))
             .total_seconds() / 86400 < _BACKFILL_THRESHOLD_D)
-        entries.append({
+        entry = {
             "key": key, "issuetype": itype, "summary": summary[:70],
             "dev_days_in_progress": dev, "test_days_in_testing": test,
-            "calendar_days": round(span, 1) if span is not None else None,
             "ratio_test_vs_dev": round(test / dev, 2) if dev > 0.1 else None,
             "status_backfilled": backfilled,
-        })
+        }
+        if status is not None:
+            entry["status"] = status
+        (entries if target is None else target).append(entry)
 
     add_entry(lifecycle["key"], lifecycle["issuetype"], lifecycle["summary"],
-              lifecycle["transitions"], lifecycle["time_in_status_days"],
-              lifecycle["created"], lifecycle["resolutiondate"])
+              lifecycle["transitions"], lifecycle["time_in_status_days"])
 
-    # The run's defects: Jira fix cycle + TestRail failed→passed retest gap.
-    defect_keys = [d["key"] for d in run_metrics["defects"]]
-    if defect_keys:
-        try:
-            for i in jira.search(f"issuekey in ({','.join(defect_keys)})",
-                                 "summary,issuetype,status,created,resolutiondate",
-                                 max_results=50, expand="changelog"):
-                trans = _status_transitions(i)
-                add_entry(i["key"], i["fields"]["issuetype"]["name"].strip(),
-                          i["fields"]["summary"], trans,
-                          _time_in_status(i, trans), i["fields"]["created"],
-                          i["fields"].get("resolutiondate"))
-        except requests.RequestException as exc:
-            print(f"  ⚠️ defect changelog fetch failed: {exc}", file=sys.stderr)
+    # The run's defects: Jira fix cycle + TestRail failed→passed retest gap. The
+    # issues (incl. changelog) were already fetched in build_run_metrics.
+    for i in run_metrics.get("_defect_issues_raw") or []:
+        trans = _status_transitions(i)
+        add_entry(i["key"], i["fields"]["issuetype"]["name"].strip(),
+                  i["fields"]["summary"], trans, _time_in_status(i, trans))
 
     retest_gaps = []
     results = sorted(run_metrics.get("_results_raw") or [],
@@ -924,7 +914,8 @@ def build_dev_test_ratio(jira: JiraClient, lifecycle: dict,
         if not r.get("defects"):
             continue
         for later in results[idx + 1:]:
-            if later["test_id"] == r["test_id"] and later.get("status_id") == 1:
+            if (later["test_id"] == r["test_id"]
+                    and later.get("status_id") == TR_PASSED):
                 retest_gaps.append({
                     "defects": r["defects"],
                     "failed_at": datetime.fromtimestamp(r["created_on"]).isoformat(),
@@ -933,28 +924,17 @@ def build_dev_test_ratio(jira: JiraClient, lifecycle: dict,
                 })
                 break
 
-    epic_children = []
     if epic_key:
         try:
             for i in jira.search(f'"Epic Link" = {epic_key} ORDER BY key ASC',
                                  "summary,issuetype,status,created,resolutiondate",
                                  max_results=100, expand="changelog"):
                 trans = _status_transitions(i)
-                dev, test = _phase_days(_time_in_status(i, trans))
-                backfilled = bool(trans) and (
-                    (_dt(trans[-1]["ts"]) - _dt(trans[0]["ts"]))
-                    .total_seconds() / 86400 < _BACKFILL_THRESHOLD_D)
-                epic_children.append({
-                    "key": i["key"],
-                    "issuetype": i["fields"]["issuetype"]["name"].strip(),
-                    "status": i["fields"]["status"]["name"],
-                    "summary": i["fields"]["summary"][:70],
-                    "dev_days_in_progress": dev,
-                    "test_days_in_testing": test,
-                    "ratio_test_vs_dev": (round(test / dev, 2)
-                                          if dev > 0.1 else None),
-                    "status_backfilled": backfilled,
-                })
+                add_entry(i["key"], i["fields"]["issuetype"]["name"].strip(),
+                          i["fields"]["summary"], trans,
+                          _time_in_status(i, trans),
+                          status=i["fields"]["status"]["name"],
+                          target=epic_children)
         except requests.RequestException as exc:
             print(f"  ⚠️ epic children fetch failed: {exc}", file=sys.stderr)
 
@@ -1114,7 +1094,7 @@ def build_value_stream(lifecycle: dict, run_metrics: dict, dev_test: dict) -> di
                 else None)
 
     ep = run_metrics["effort_proxy"]
-    active_test_days = sum(v["active_days"] for v in ep["per_tester"].values())
+    active_test_days = ep["active_test_days"]
     exec_window_wd = _workdays(first_res, last_res) if first_res and last_res else 0.0
     # Stilstand binnen het executievenster: werkdagen zonder enig resultaat.
     result_days = {datetime.fromtimestamp(r["created_on"]).date()
@@ -1188,10 +1168,6 @@ def build_value_stream(lifecycle: dict, run_metrics: dict, dev_test: dict) -> di
     total_active = sum(s["active_days"] for s in steps)
     total_wait = sum(s["wait_days"] for s in steps)
     lead = total_active + total_wait
-    ca_vals = [s["ca_pct"] / 100 for s in steps if s["ca_pct"] is not None]
-    rolled_ca = 1.0
-    for v in ca_vals:
-        rolled_ca *= v
 
     # Geautomatiseerd scenario: uitvoering en hertest vallen weg als handwerk.
     auto_steps = []
@@ -1222,7 +1198,6 @@ def build_value_stream(lifecycle: dict, run_metrics: dict, dev_test: dict) -> di
             "wait_days": round(total_wait, 1),
             "lead_time_days": round(lead, 1),
             "flow_efficiency_pct": round(100 * total_active / lead) if lead else None,
-            "rolled_first_pass_pct": round(rolled_ca * 100),
         },
         "automated_scenario": {
             "steps": auto_steps,
@@ -1319,6 +1294,18 @@ def build_timeline(lifecycle: dict, run_metrics: dict) -> dict:
 # ── D. Effort / ROI model ────────────────────────────────────────────────────
 
 
+def _annualised(by_year: dict, value_of, year_frac: float, now_year: int) -> float:
+    """Gemiddeld jaarvolume over de waargenomen jaren; het lopende (deel)jaar
+    wordt geëxtrapoleerd via `year_frac`."""
+    per_year = []
+    for year in by_year:
+        n = value_of(year)
+        if int(year) == now_year:
+            n = n / year_frac
+        per_year.append(n)
+    return statistics.mean(per_year) if per_year else 0
+
+
 def build_roi_model(run_metrics: dict, corpus: dict | None) -> dict:
     anchor = run_metrics["effort_proxy"]["pooled_median_gap_min"] or 10.0
     reexec = run_metrics["executions_per_test"]["mean"] or 1.0
@@ -1329,29 +1316,20 @@ def build_roi_model(run_metrics: dict, corpus: dict | None) -> dict:
     if corpus:
         now = datetime.now()
         year_frac = max((now.timetuple().tm_yday) / 365, 0.1)
+        by_year = corpus["by_year"]
         for scope, key in (("regression_subset", "regr_executed"),
                            ("whole_suite", "tests_executed")):
-            per_year = []
-            for year, agg in corpus["by_year"].items():
-                n = agg[key]
-                if int(year) == now.year:
-                    n = n / year_frac
-                per_year.append(n)
-            tests_year = statistics.mean(per_year) if per_year else 0
+            tests_year = _annualised(by_year, lambda y, k=key: by_year[y][k],
+                                     year_frac, now.year)
             scopes[scope] = round(tests_year * reexec)
         # Scenario-scope: de-facto regression (pass→rerun executions — tests
         # re-run after a pass, i.e. regression behaviour without the title).
         dfr_years = ((corpus.get("defacto_regression") or {})
                      .get("pass_rerun_executions_by_year") or {})
         if dfr_years:
-            per_year = []
-            for year in corpus["by_year"]:
-                n = dfr_years.get(year, 0)
-                if int(year) == now.year:
-                    n = n / year_frac
-                per_year.append(n)
             scopes["defacto_regression"] = round(
-                (statistics.mean(per_year) if per_year else 0) * reexec)
+                _annualised(by_year, lambda y: dfr_years.get(y, 0),
+                            year_frac, now.year) * reexec)
 
     bands = {"low": round(anchor * 0.75, 1), "mid": round(anchor * 1.5, 1),
              "high": round(anchor * 2.0, 1)}
@@ -1860,6 +1838,15 @@ def _begrippen_md() -> list[str]:
     return L
 
 
+def _md_table(headers: list, rows) -> list[str]:
+    """Markdown pipe-tabel: kopregel + scheidingsregel (breedte volgt uit de
+    headers) + één regel per rij. Vervangt het handmatige `|---|`-ceremonieel."""
+    out = ["| " + " | ".join(str(h) for h in headers) + " |",
+           "|" + "|".join("---" for _ in headers) + "|"]
+    out += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
+    return out
+
+
 def render_report_md(report: dict) -> str:
     lc = report["jira_lifecycle"]
     rm = report["testrail_run"]
@@ -1885,7 +1872,7 @@ def render_report_md(report: dict) -> str:
         t0 = vs0["totals"]
         a0 = vs0["automated_scenario"]
         ep0 = rm["effort_proxy"]
-        testdagen = sum(v["active_days"] for v in ep0["per_tester"].values())
+        testdagen = ep0["active_test_days"]
         L.append("## 0. De kern — in testdagen\n")
         L.append("| Vraag | Antwoord |")
         L.append("|---|---|")
@@ -2014,35 +2001,37 @@ def render_report_md(report: dict) -> str:
     L.append("")
 
     L.append("## 3. Onderwerpen (W-codes)\n")
-    L.append("| W-code | Tests | Executies | Failed | Defects |")
-    L.append("|---|---|---|---|---|")
-    for code, v in rm["w_codes"].items():
-        L.append(f"| {code} | {v['tests']} | {v['executions']} | {v['failed']} | "
-                 f"{', '.join(v['defects']) or '—'} |")
+    L.extend(_md_table(
+        ["W-code", "Tests", "Executies", "Failed", "Defects"],
+        [[code, v["tests"], v["executions"], v["failed"],
+          ", ".join(v["defects"]) or "—"] for code, v in rm["w_codes"].items()]))
     L.append("")
 
     L.append("## 4. Defects uit deze run\n")
-    L.append("| Key | Type | Status | Aangemaakt | Opgelost | Dagen |")
-    L.append("|---|---|---|---|---|---|")
-    for d in rm["defects"]:
-        L.append(f"| {d['key']} | {d['issuetype']} | {d['status']} | "
-                 f"{d['created'][:10]} | {(d['resolved'] or '—')[:10]} | "
-                 f"{d['resolution_days'] if d['resolution_days'] is not None else '—'} |")
+    L.extend(_md_table(
+        ["Key", "Type", "Status", "Aangemaakt", "Opgelost", "Dagen"],
+        [[d["key"], d["issuetype"], d["status"], d["created"][:10],
+          (d["resolved"] or "—")[:10],
+          d["resolution_days"] if d["resolution_days"] is not None else "—"]
+         for d in rm["defects"]]))
     L.append("")
 
     if corpus:
         dfr5 = corpus.get("defacto_regression")
         dfr_years = ((dfr5 or {}).get("pass_rerun_executions_by_year") or {})
         L.append("## 5. Corpus en frequentie (suite {})\n".format(corpus["suite_id"]))
-        extra_col = " De-facto (pass→rerun) |" if dfr5 else ""
-        L.append("| Jaar | Runs | Tests (aangemaakt) | Tests (uitgevoerd) | "
-                 "Regressie-runs | Regressie uitgevoerd (getiteld) |" + extra_col)
-        L.append("|---|---|---|---|---|---|" + ("---|" if dfr5 else ""))
+        headers = ["Jaar", "Runs", "Tests (aangemaakt)", "Tests (uitgevoerd)",
+                   "Regressie-runs", "Regressie uitgevoerd (getiteld)"]
+        if dfr5:
+            headers.append("De-facto (pass→rerun)")
+        rows = []
         for year, agg in corpus["by_year"].items():
-            extra = f" {dfr_years.get(year, 0)} |" if dfr5 else ""
-            L.append(f"| {year} | {agg['runs']} | {agg['tests']} | "
-                     f"{agg['tests_executed']} | {agg['regr_runs']} | "
-                     f"{agg['regr_executed']} |" + extra)
+            row = [year, agg["runs"], agg["tests"], agg["tests_executed"],
+                   agg["regr_runs"], agg["regr_executed"]]
+            if dfr5:
+                row.append(dfr_years.get(year, 0))
+            rows.append(row)
+        L.extend(_md_table(headers, rows))
         L.append("")
         L.append("_Alleen **uitgevoerde** tests tellen mee in het ROI-model; "
                  "aangemaakte-maar-nooit-gedraaide suite-runs (bv. 3× een "
@@ -2067,15 +2056,14 @@ def render_report_md(report: dict) -> str:
              f"{round(a['maintenance_pct_of_build_per_year'] * 100)}%/jaar; restinspanning "
              f"na automatisering {round(a['automation_residual_effort'] * 100)}%.\n")
     L.append(f"Jaarlijkse executies per scope: {roi['annual_executions_by_scope']}\n")
-    L.append("| Scope | Band | Min/exec | Handm. uren/jr | Bouw u/case | "
-             "Bouw totaal | Netto besparing/jr | Terugverdientijd |")
-    L.append("|---|---|---|---|---|---|---|---|")
-    for s in roi["scenarios"]:
-        pay = f"{s['payback_years']} jr" if s["payback_years"] else "n.v.t."
-        L.append(f"| {s['scope']} | {s['effort_band']} | "
-                 f"{s['minutes_per_execution']} | {s['annual_manual_hours']} | "
-                 f"{s['build_hours_per_case']} | {s['build_hours_total']} | "
-                 f"{s['annual_net_saving_hours']} | {pay} |")
+    L.extend(_md_table(
+        ["Scope", "Band", "Min/exec", "Handm. uren/jr", "Bouw u/case",
+         "Bouw totaal", "Netto besparing/jr", "Terugverdientijd"],
+        [[s["scope"], s["effort_band"], s["minutes_per_execution"],
+          s["annual_manual_hours"], s["build_hours_per_case"],
+          s["build_hours_total"], s["annual_net_saving_hours"],
+          f"{s['payback_years']} jr" if s["payback_years"] else "n.v.t."]
+         for s in roi["scenarios"]]))
     L.append("")
     L.extend(_doelcadans_md(roi))
 
@@ -2088,18 +2076,25 @@ def render_report_md(report: dict) -> str:
                  f"Actieve bouwtijd geschat op {vs['fte_factor']} FTE "
                  f"(40 u/week); testinzet is gemeten._\n")
         has_basis = any("basis" in s for s in vs["steps"])
-        basis_col = " Basis |" if has_basis else ""
-        L.append("| Stap | Actieve tijd | Wachttijd | First-time-right |"
-                 + basis_col + " Toelichting |")
-        L.append("|---|---|---|---|" + ("---|" if has_basis else "") + "---|")
+        headers = ["Stap", "Actieve tijd", "Wachttijd", "First-time-right"]
+        if has_basis:
+            headers.append("Basis")
+        headers.append("Toelichting")
+        rows = []
         for s in vs["steps"]:
             ca = f"{s['ca_pct']}%" if s["ca_pct"] is not None else "—"
-            basis = f" {s.get('basis', '—')} |" if has_basis else ""
-            L.append(f"| {s['step']} | {s['active_days']} d | {s['wait_days']} d "
-                     f"| {ca} |" + basis + f" {s['note']} |")
-        L.append(f"| **Totaal** | **{t['active_days']} d** | "
-                 f"**{t['wait_days']} d** | — |" + (" — |" if has_basis else "")
-                 + f" doorlooptijd **{t['lead_time_days']} werkdagen** |")
+            row = [s["step"], f"{s['active_days']} d", f"{s['wait_days']} d", ca]
+            if has_basis:
+                row.append(s.get("basis", "—"))
+            row.append(s["note"])
+            rows.append(row)
+        total = ["**Totaal**", f"**{t['active_days']} d**",
+                 f"**{t['wait_days']} d**", "—"]
+        if has_basis:
+            total.append("—")
+        total.append(f"doorlooptijd **{t['lead_time_days']} werkdagen**")
+        rows.append(total)
+        L.extend(_md_table(headers, rows))
         L.append("")
         L.append(f"**Flow-efficiëntie: {t['flow_efficiency_pct']}%** — van de "
                  f"{t['lead_time_days']} werkdagen doorlooptijd wordt er "
@@ -2124,14 +2119,16 @@ def render_report_md(report: dict) -> str:
         if cp["non_regression_by_year"]:
             has_dfr = any("defacto_pass_rerun" in v
                           for v in cp["non_regression_by_year"].values())
-            L.append("| Jaar | Non-regressie uitgevoerd | Regressie uitgevoerd |"
-                     + (" Waarvan de-facto regressie (pass→rerun) |"
-                        if has_dfr else ""))
-            L.append("|---|---|---|" + ("---|" if has_dfr else ""))
+            headers = ["Jaar", "Non-regressie uitgevoerd", "Regressie uitgevoerd"]
+            if has_dfr:
+                headers.append("Waarvan de-facto regressie (pass→rerun)")
+            rows = []
             for year, v in cp["non_regression_by_year"].items():
-                extra = (f" {v.get('defacto_pass_rerun', 0)} |" if has_dfr else "")
-                L.append(f"| {year} | {v['non_regression_executed']} | "
-                         f"{v['regression_executed']} |" + extra)
+                row = [year, v["non_regression_executed"], v["regression_executed"]]
+                if has_dfr:
+                    row.append(v.get("defacto_pass_rerun", 0))
+                rows.append(row)
+            L.extend(_md_table(headers, rows))
             L.append("")
             if has_dfr:
                 L.append("_De kolom 'de-facto' telt her-uitvoeringen van "
@@ -2139,14 +2136,14 @@ def render_report_md(report: dict) -> str:
                          "feitelijk regressieverificatie zijn._\n")
         L.append("Wijzigingsdruk per W-stap (Jira-issues met de stap in de "
                  f"titel, projecten {cp['jira_projects_scanned']}):\n")
-        L.append("| W-stap | Cases in suite | In case-study-run | Jira-issues | "
-                 "Stories | Bugs | Voorbeeld |")
-        L.append("|---|---|---|---|---|---|---|")
-        for step, v in cp["per_step"].items():
-            ex = v["examples"][0] if v["examples"] else "—"
-            L.append(f"| {step} | {v['cases_in_suite']} | "
-                     f"{'✓' if v['in_case_study_run'] else '**✗**'} | "
-                     f"{v['jira_issues']} | {v['stories']} | {v['bugs']} | {ex} |")
+        L.extend(_md_table(
+            ["W-stap", "Cases in suite", "In case-study-run", "Jira-issues",
+             "Stories", "Bugs", "Voorbeeld"],
+            [[step, v["cases_in_suite"],
+              "✓" if v["in_case_study_run"] else "**✗**",
+              v["jira_issues"], v["stories"], v["bugs"],
+              v["examples"][0] if v["examples"] else "—"]
+             for step, v in cp["per_step"].items()]))
         L.append("")
         missing = cp["steps_missing_from_case_study_run"]
         if missing:
@@ -2159,27 +2156,28 @@ def render_report_md(report: dict) -> str:
     if dt:
         L.append("## 8. Dev- vs testinspanning (kalenderproxy)\n")
         L.append(f"_{dt['method']}_\n")
-        L.append("| Issue | Type | Dev (In Progress, d) | Test (In testing, d) | "
-                 "Ratio test:dev | Backfilled |")
-        L.append("|---|---|---|---|---|---|")
-        for e in dt["entries"]:
-            L.append(f"| {e['key']} | {e['issuetype']} | "
-                     f"{e['dev_days_in_progress']} | {e['test_days_in_testing']} | "
-                     f"{e['ratio_test_vs_dev'] if e['ratio_test_vs_dev'] is not None else '—'} | "
-                     f"{'⚠️' if e['status_backfilled'] else ''} |")
+
+        def _ratio(e):
+            return e["ratio_test_vs_dev"] if e["ratio_test_vs_dev"] is not None else "—"
+
+        L.extend(_md_table(
+            ["Issue", "Type", "Dev (In Progress, d)", "Test (In testing, d)",
+             "Ratio test:dev", "Backfilled"],
+            [[e["key"], e["issuetype"], e["dev_days_in_progress"],
+              e["test_days_in_testing"], _ratio(e),
+              "⚠️" if e["status_backfilled"] else ""]
+             for e in dt["entries"]]))
         L.append("")
         if dt["epic_children"]:
             L.append(f"Epic-breed ({dt['epic_key']}, "
                      f"{len(dt['epic_children'])} children):\n")
-            L.append("| Issue | Type | Status | Dev (d) | Test (d) | Ratio | "
-                     "Backfilled |")
-            L.append("|---|---|---|---|---|---|---|")
-            for e in dt["epic_children"]:
-                L.append(f"| {e['key']} | {e['issuetype']} | {e['status']} | "
-                         f"{e['dev_days_in_progress']} | "
-                         f"{e['test_days_in_testing']} | "
-                         f"{e['ratio_test_vs_dev'] if e['ratio_test_vs_dev'] is not None else '—'} | "
-                         f"{'⚠️' if e['status_backfilled'] else ''} |")
+            L.extend(_md_table(
+                ["Issue", "Type", "Status", "Dev (d)", "Test (d)", "Ratio",
+                 "Backfilled"],
+                [[e["key"], e["issuetype"], e["status"], e["dev_days_in_progress"],
+                  e["test_days_in_testing"], _ratio(e),
+                  "⚠️" if e["status_backfilled"] else ""]
+                 for e in dt["epic_children"]]))
             L.append("")
         rs = dt["ratio_summary"]
         rg = dt["retest_gap_days"]
@@ -2273,6 +2271,16 @@ def _export_docx(md_path: Path) -> Path | None:
         return None
 
 
+def _write_csv(path: Path, header: list, rows) -> Path:
+    """Eén CSV met UTF-8 + `newline=""` (de invarianten die anders per blok
+    herhaald werden)."""
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(header)
+        w.writerows(rows)
+    return path
+
+
 def write_outputs(report: dict, out_dir: Path) -> list[Path]:
     # Per-Jira-key subdir: one investigation = one folder, so a second dataset
     # never interleaves with the first and the folder IS the case record.
@@ -2293,92 +2301,69 @@ def write_outputs(report: dict, out_dir: Path) -> list[Path]:
     paths.append(p)
 
     if report.get("corpus"):
-        p = out_dir / f"{stem}_runs.csv"
-        with p.open("w", newline="", encoding="utf-8") as fh:
-            w = csv.writer(fh)
-            w.writerow(["run_id", "date", "year", "name", "tests", "tests_executed",
-                        "regression_tests", "regression_executed", "is_regression",
-                        "passed", "failed"])
-            for r in report["corpus"]["per_run"]:
-                w.writerow([r["run_id"],
-                            datetime.fromtimestamp(r["created_on"]).date(),
-                            r["year"], r["name"], r["tests"], r["tests_executed"],
-                            r["regression_tests"], r["regression_executed"],
-                            r["is_regression"], r["passed"], r["failed"]])
-        paths.append(p)
+        paths.append(_write_csv(
+            out_dir / f"{stem}_runs.csv",
+            ["run_id", "date", "year", "name", "tests", "tests_executed",
+             "regression_tests", "regression_executed", "is_regression",
+             "passed", "failed"],
+            ([r["run_id"], datetime.fromtimestamp(r["created_on"]).date(),
+              r["year"], r["name"], r["tests"], r["tests_executed"],
+              r["regression_tests"], r["regression_executed"],
+              r["is_regression"], r["passed"], r["failed"]]
+             for r in report["corpus"]["per_run"])))
 
     dfr = (report.get("corpus") or {}).get("defacto_regression")
     if dfr and dfr.get("cases_detail"):
-        p = out_dir / f"{stem}_defacto_regression.csv"
-        with p.open("w", newline="", encoding="utf-8") as fh:
-            w = csv.writer(fh)
-            w.writerow(["case_id", "title", "section", "w_codes", "runs_seen",
-                        "pass_reruns", "retests", "milestones", "distinct_refs",
-                        "titled_regression", "first_seen", "last_seen"])
-            for c in dfr["cases_detail"]:
-                w.writerow([c["case_id"], c["title"], c["section"],
-                            " ".join(c["w_codes"]), c["runs_seen"],
-                            c["pass_reruns"], c["retests"], c["milestones"],
-                            c["distinct_refs"], c["titled_regression"],
-                            c["first_seen"], c["last_seen"]])
-        paths.append(p)
+        paths.append(_write_csv(
+            out_dir / f"{stem}_defacto_regression.csv",
+            ["case_id", "title", "section", "w_codes", "runs_seen",
+             "pass_reruns", "retests", "milestones", "distinct_refs",
+             "titled_regression", "first_seen", "last_seen"],
+            ([c["case_id"], c["title"], c["section"], " ".join(c["w_codes"]),
+              c["runs_seen"], c["pass_reruns"], c["retests"], c["milestones"],
+              c["distinct_refs"], c["titled_regression"], c["first_seen"],
+              c["last_seen"]] for c in dfr["cases_detail"])))
 
-    p = out_dir / f"{stem}_defects.csv"
-    with p.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
-        w.writerow(["key", "issuetype", "status", "created", "resolved",
-                    "resolution_days", "summary"])
-        for d in report["testrail_run"]["defects"]:
-            w.writerow([d["key"], d["issuetype"], d["status"], d["created"][:10],
-                        (d["resolved"] or "")[:10], d["resolution_days"], d["summary"]])
-    paths.append(p)
+    paths.append(_write_csv(
+        out_dir / f"{stem}_defects.csv",
+        ["key", "issuetype", "status", "created", "resolved",
+         "resolution_days", "summary"],
+        ([d["key"], d["issuetype"], d["status"], d["created"][:10],
+          (d["resolved"] or "")[:10], d["resolution_days"], d["summary"]]
+         for d in report["testrail_run"]["defects"])))
 
     cp = report.get("change_pressure")
     if cp and cp["per_step"]:
-        p = out_dir / f"{stem}_wsteps.csv"
-        with p.open("w", newline="", encoding="utf-8") as fh:
-            w = csv.writer(fh)
-            w.writerow(["w_step", "cases_in_suite", "in_case_study_run",
-                        "jira_issues", "stories", "bugs", "example"])
-            for step, v in cp["per_step"].items():
-                w.writerow([step, v["cases_in_suite"], v["in_case_study_run"],
-                            v["jira_issues"], v["stories"], v["bugs"],
-                            v["examples"][0] if v["examples"] else ""])
-        paths.append(p)
+        paths.append(_write_csv(
+            out_dir / f"{stem}_wsteps.csv",
+            ["w_step", "cases_in_suite", "in_case_study_run", "jira_issues",
+             "stories", "bugs", "example"],
+            ([step, v["cases_in_suite"], v["in_case_study_run"],
+              v["jira_issues"], v["stories"], v["bugs"],
+              v["examples"][0] if v["examples"] else ""]
+             for step, v in cp["per_step"].items())))
 
     dt = report.get("dev_test")
     if dt:
-        p = out_dir / f"{stem}_devtest.csv"
-        with p.open("w", newline="", encoding="utf-8") as fh:
-            w = csv.writer(fh)
-            w.writerow(["key", "scope", "issuetype", "status", "dev_days",
-                        "test_days", "ratio_test_vs_dev", "backfilled",
-                        "summary", "test_provenance", "testrail_runs",
-                        "testrail_window_days"])
-            for e in dt["entries"]:
-                w.writerow([e["key"], "case_study", e["issuetype"], "",
-                            e["dev_days_in_progress"], e["test_days_in_testing"],
-                            e["ratio_test_vs_dev"], e["status_backfilled"],
-                            e["summary"], e.get("test_provenance", ""),
-                            e.get("testrail_runs", ""),
-                            e.get("testrail_window_days", "")])
-            for e in dt["epic_children"]:
-                w.writerow([e["key"], "epic", e["issuetype"], e["status"],
-                            e["dev_days_in_progress"], e["test_days_in_testing"],
-                            e["ratio_test_vs_dev"], e["status_backfilled"],
-                            e["summary"], e.get("test_provenance", ""),
-                            e.get("testrail_runs", ""),
-                            e.get("testrail_window_days", "")])
-        paths.append(p)
+        def _devtest_row(e, scope):
+            return [e["key"], scope, e["issuetype"], e.get("status", ""),
+                    e["dev_days_in_progress"], e["test_days_in_testing"],
+                    e["ratio_test_vs_dev"], e["status_backfilled"],
+                    e["summary"], e.get("test_provenance", ""),
+                    e.get("testrail_runs", ""), e.get("testrail_window_days", "")]
+        paths.append(_write_csv(
+            out_dir / f"{stem}_devtest.csv",
+            ["key", "scope", "issuetype", "status", "dev_days", "test_days",
+             "ratio_test_vs_dev", "backfilled", "summary", "test_provenance",
+             "testrail_runs", "testrail_window_days"],
+            [_devtest_row(e, "case_study") for e in dt["entries"]]
+            + [_devtest_row(e, "epic") for e in dt["epic_children"]]))
 
-    p = out_dir / f"{stem}_timeline.csv"
-    with p.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
-        w.writerow(["ts", "system", "entity", "event", "phase", "detail"])
-        for e in report["timeline"]["events"]:
-            w.writerow([e["ts"], e["system"], e["entity"], e["event"],
-                        e["phase"], e["detail"]])
-    paths.append(p)
+    paths.append(_write_csv(
+        out_dir / f"{stem}_timeline.csv",
+        ["ts", "system", "entity", "event", "phase", "detail"],
+        ([e["ts"], e["system"], e["entity"], e["event"], e["phase"], e["detail"]]
+         for e in report["timeline"]["events"])))
 
     p = out_dir / f"{stem}_report.md"
     p.write_text(render_report_md(report), encoding="utf-8")
@@ -2408,7 +2393,7 @@ def _build_deck(report: dict, out_dir: Path) -> list[Path]:
         pptx = out_dir / "testauto_businesscase_mgmt.pptx"
         md = out_dir / "deck_content.md"
         md.write_text(dc.to_md(content, f), encoding="utf-8")
-        bmd.build(report, content, f, pptx)
+        bmd.build(content, pptx)
         return [md, pptx]
     except Exception as exc:  # noqa: BLE001 — deck is best-effort, never fatal
         print(f"  ⚠️ deck-render mislukt: {exc}", file=sys.stderr)

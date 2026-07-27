@@ -38,11 +38,6 @@ LIGHT = RGBColor(0xE8, 0xF1, 0xFA)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 
-def _r(x: float) -> int:
-    """Ronde af op hele eenheden — managers lezen geen decimalen."""
-    return int(round(x))
-
-
 class Deck:
     def __init__(self):
         self.prs = Presentation()
@@ -163,8 +158,8 @@ def _vsm_row(d: Deck, s, y, rows, *, label):
     r.font.color.rgb = DARK
     for i, cells in enumerate(rows):
         name = cells[0]
-        active = _r(float(cells[1])) if len(cells) > 1 and cells[1] else 0
-        wait = _r(float(cells[2])) if len(cells) > 2 and cells[2] else 0
+        active = dc._r(float(cells[1])) if len(cells) > 1 and cells[1] else 0
+        wait = dc._r(float(cells[2])) if len(cells) > 2 and cells[2] else 0
         ca_raw = cells[3] if len(cells) > 3 else "-"
         ca = None if ca_raw in ("", "-") else int(float(ca_raw))
         marker = cells[4] if len(cells) > 4 else ""
@@ -215,12 +210,13 @@ def _vsm_row(d: Deck, s, y, rows, *, label):
             x += gap
 
 
-def build(data: dict, content: dict[str, str], f: dict, out_path: Path) -> int:
-    """Render het deck. ALLE zichtbare tekst komt uit `content` (het bewerkbare
-    checkpoint); `f` levert alleen de testertabel. `data` wordt niet meer voor
-    tekst gelezen — zo bepaalt een bewerkte deck_content.md het hele deck."""
-    def C(k, default=""):
-        return content.get(k) or default
+def build(content: dict[str, str], out_path: Path) -> int:
+    """Render het deck. ÁLLE zichtbare tekst — inclusief de testertabel en de
+    tijdlijnrijen — komt uit `content`, het bewerkbare checkpoint. `content` is
+    bij het inladen over de standaardtekst heen gemerged, dus elke sleutel
+    bestaat; noch `data` noch `f` wordt nog voor tekst gelezen."""
+    def C(k):
+        return content.get(k, "")
     d = Deck()
 
     # 1. titel
@@ -253,16 +249,13 @@ def build(data: dict, content: dict[str, str], f: dict, out_path: Path) -> int:
     tf = d.box(s, Inches(0.7), Inches(1.6), Inches(12.0), Inches(5.4))
     d.bullets(tf, dc.bullets(C("situatie.bullets")), size=22)
 
-    # 3. tijdlijn (waardestroom) — nu vs straks. Rijen komen uit het checkpoint;
-    # oude checkpoints zonder die sleutels vallen terug op de JSON-stappen.
+    # 3. tijdlijn (waardestroom) — nu vs straks. Rijen komen uit het checkpoint
+    # (bij het inladen over de standaardtekst gemerged, dus altijd aanwezig).
     s = d.slide()
     d.title(s, C("tijdlijn.kop"), C("tijdlijn.sub"))
-    default_nu = dc._vsm_rows(data["value_stream"]["steps"])
-    default_straks = dc._vsm_rows(data["value_stream"]["automated_scenario"]["steps"])
-    _vsm_row(d, s, Inches(1.55), dc.pipe_rows(C("tijdlijn.rijen_nu", default_nu)),
+    _vsm_row(d, s, Inches(1.55), dc.pipe_rows(C("tijdlijn.rijen_nu")),
              label=C("tijdlijn.nu"))
-    _vsm_row(d, s, Inches(4.15),
-             dc.pipe_rows(C("tijdlijn.rijen_straks", default_straks)),
+    _vsm_row(d, s, Inches(4.15), dc.pipe_rows(C("tijdlijn.rijen_straks")),
              label=C("tijdlijn.straks"))
     tf = d.box(s, Inches(0.6), Inches(6.15), Inches(12.2), Inches(1.2))
     d.bullets(tf, dc.bullets(C("tijdlijn.bullets")), size=16)
@@ -288,19 +281,19 @@ def build(data: dict, content: dict[str, str], f: dict, out_path: Path) -> int:
     tf = d.box(s, Inches(0.7), Inches(3.5), Inches(5.8), Inches(0.5))
     p = tf.paragraphs[0]
     r = p.add_run()
-    r.text = C("ronde.tabelkop", "Werkverdeling (geanonimiseerd):")
+    r.text = C("ronde.tabelkop")
     r.font.size = Pt(18)
     r.font.bold = True
     r.font.color.rgb = DARK
-    d.table(s, Inches(0.7), Inches(4.1), Inches(5.8), f["tester_table"],
-            col_w=[1, 1, 2.4], size=15)
+    d.table(s, Inches(0.7), Inches(4.1), Inches(5.8),
+            dc.pipe_rows(C("ronde.tabel")), col_w=[1, 1, 2.4], size=15)
     tf = d.box(s, Inches(7.0), Inches(4.1), Inches(5.8), Inches(2.8))
     d.bullets(tf, dc.bullets(C("ronde.bullets")), size=17)
 
     # 5. de rekensom
     s = d.slide()
     d.title(s, C("rekensom.kop"), C("rekensom.sub"))
-    kopregel = dc.pipe_rows(C("rekensom.kopregel", "|Vraag|Antwoord"))
+    kopregel = dc.pipe_rows(C("rekensom.kopregel"))
     d.table(s, Inches(0.7), Inches(1.5), Inches(11.9),
             kopregel + dc.pipe_rows(C("rekensom.rows")),
             col_w=[0.4, 3.6, 7.9], size=16)
@@ -377,7 +370,10 @@ def main() -> None:
         return
 
     if args.content:
-        content = dc.parse_md(Path(args.content).read_text(encoding="utf-8"))
+        # Merge de bewerkte tekst over de standaard, zodat elke sleutel bestaat
+        # (oude checkpoints die nieuwe sleutels missen vallen zo terug).
+        edited = dc.parse_md(Path(args.content).read_text(encoding="utf-8"))
+        content = {**dc.default_content(f), **edited}
         src = f"tekst: {Path(args.content).name}"
     else:
         content = dc.default_content(f)
@@ -385,7 +381,7 @@ def main() -> None:
 
     out_path = Path(args.out) if args.out else \
         json_dir / "testauto_businesscase_mgmt.pptx"
-    n = build(data, content, f, out_path)
+    n = build(content, out_path)
     print(f"✓ {out_path} — {n} slides "
           f"(data: {Path(path).name} · {src} · {f['story_key']}/run {f['run_id']})")
 
