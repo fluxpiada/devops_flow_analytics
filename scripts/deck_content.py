@@ -78,9 +78,9 @@ def _vsm_rows(steps: list[dict]) -> str:
     for s in steps:
         ca = str(s["ca_pct"]) if s.get("ca_pct") is not None else "-"
         marker = "*" if "aanname" in (s.get("basis") or "").lower() else ""
-        rows.append(f"{_clean_step(s['step'])}|{_r(s['active_days'])}|"
-                    f"{_r(s['wait_days'])}|{ca}|{marker}")
-    return "\n".join(rows)
+        rows.append([_clean_step(s["step"]), _r(s["active_days"]),
+                     _r(s["wait_days"]), ca, marker])
+    return _rows_to_pipe(rows)
 
 
 def _tester_table(per_tester: list[dict], tot_res: int) -> list[list]:

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import itertools
 import json
 import re
 import shutil
@@ -384,11 +385,12 @@ def build_run_metrics(tr: TestRailClient, jira: JiraClient, run_id: int) -> dict
     per_test = Counter(r["test_id"] for r in results)
 
     # First-pass rate: earliest meaningful-status result per test is 'passed'.
-    first_status: dict[int, str] = {}
+    # Decide on the status *id* (fixed system value), not the renamable name.
+    first_status: dict[int, int] = {}
     for r in sorted(results, key=lambda x: x["created_on"]):
         if r.get("status_id") and r["test_id"] not in first_status:
-            first_status[r["test_id"]] = status_names.get(r["status_id"], "?")
-    first_pass = sum(1 for s in first_status.values() if s == "passed")
+            first_status[r["test_id"]] = r["status_id"]
+    first_pass = sum(1 for sid in first_status.values() if sid == TR_PASSED)
 
     # Per-W-code subject breakdown (a test spanning W010->W100 counts for both).
     test_codes = {t["id"]: _w_codes(t.get("title")) for t in tests}
@@ -400,7 +402,7 @@ def build_run_metrics(tr: TestRailClient, jira: JiraClient, run_id: int) -> dict
     for r in results:
         for code in test_codes.get(r["test_id"], set()):
             w_codes[code]["executions"] += 1
-            if status_names.get(r.get("status_id")) == "failed":
+            if r.get("status_id") == TR_FAILED:
                 w_codes[code]["failed"] += 1
             for d in re.split(r"[,\s]+", r.get("defects") or ""):
                 if d:
@@ -1319,6 +1321,7 @@ def build_roi_model(run_metrics: dict, corpus: dict | None) -> dict:
         by_year = corpus["by_year"]
         for scope, key in (("regression_subset", "regr_executed"),
                            ("whole_suite", "tests_executed")):
+            # k=key binds the loop variable per iteration (ruff B023 idiom).
             tests_year = _annualised(by_year, lambda y, k=key: by_year[y][k],
                                      year_frac, now.year)
             scopes[scope] = round(tests_year * reexec)
@@ -1721,36 +1724,32 @@ def _defacto_md(dfr: dict) -> list[str]:
              "regressiegedrag — ongeacht wat er in de titel staat. Een "
              "her-uitvoering ná een fail/retest/blocked telt als "
              "defect-gedreven hertest, niet als regressie.\n")
-    L.append("| Metriek | Waarde |")
-    L.append("|---|---|")
-    L.append(f"| De-facto regressiecases (≥1 pass→rerun) | "
-             f"**{dfr['cases_defacto']}** |")
-    L.append(f"| Terugkerende cases (uitgevoerd in ≥{dfr['recurrence_min']} "
-             f"runs) | {dfr['cases_recurrent']} |")
-    L.append(f"| Regressie-**getitelde** cases (in runs gezien) | "
-             f"{dfr['cases_titled']} |")
-    L.append(f"| Overlap getiteld ∩ de-facto | {dfr['overlap_titled_defacto']} |")
     total_pr = sum(dfr["pass_rerun_executions_by_year"].values())
     total_rt = sum(dfr["retest_executions_by_year"].values())
-    L.append(f"| Pass→rerun-executies (totaal) | {total_pr} |")
-    L.append(f"| Defect-hertest-executies (cross-run) | {total_rt} |")
+    metric_rows = [
+        ["De-facto regressiecases (≥1 pass→rerun)", f"**{dfr['cases_defacto']}**"],
+        [f"Terugkerende cases (uitgevoerd in ≥{dfr['recurrence_min']} runs)",
+         dfr["cases_recurrent"]],
+        ["Regressie-**getitelde** cases (in runs gezien)", dfr["cases_titled"]],
+        ["Overlap getiteld ∩ de-facto", dfr["overlap_titled_defacto"]],
+        ["Pass→rerun-executies (totaal)", total_pr],
+        ["Defect-hertest-executies (cross-run)", total_rt],
+    ]
     if dfr.get("unknown_status_executions"):
-        L.append(f"| Niet-classificeerbaar (custom status) | "
-                 f"{dfr['unknown_status_executions']} |")
+        metric_rows.append(["Niet-classificeerbaar (custom status)",
+                            dfr["unknown_status_executions"]])
+    L.extend(_md_table(["Metriek", "Waarde"], metric_rows))
     L.append("")
     top = dfr.get("top_cases") or []
     if top:
         L.append("Top-{} de-facto regressiecases:\n".format(min(len(top), 20)))
-        L.append("| Case | Titel | Sectie | W-codes | Runs | Pass→rerun | "
-                 "Hertests | Milestones | Stories (refs) | Getiteld? |")
-        L.append("|---|---|---|---|---|---|---|---|---|---|")
-        for c in top:
-            L.append(f"| C{c['case_id']} | {(c['title'] or '')[:45]} | "
-                     f"{(c['section'] or '—')[:25]} | "
-                     f"{', '.join(c['w_codes']) or '—'} | {c['runs_seen']} | "
-                     f"{c['pass_reruns']} | {c['retests']} | {c['milestones']} | "
-                     f"{c['distinct_refs']} | "
-                     f"{'✓' if c['titled_regression'] else '✗'} |")
+        L.extend(_md_table(
+            ["Case", "Titel", "Sectie", "W-codes", "Runs", "Pass→rerun",
+             "Hertests", "Milestones", "Stories (refs)", "Getiteld?"],
+            [[f"C{c['case_id']}", (c["title"] or "")[:45], (c["section"] or "—")[:25],
+              ", ".join(c["w_codes"]) or "—", c["runs_seen"], c["pass_reruns"],
+              c["retests"], c["milestones"], c["distinct_refs"],
+              "✓" if c["titled_regression"] else "✗"] for c in top]))
         L.append("")
     L.append("**Wat dit betekent — stap voor stap (scenario, geen claim):**\n")
     L.append(f"1. **Observatie (gemeten):** {dfr['cases_defacto']} testgevallen "
@@ -2356,8 +2355,9 @@ def write_outputs(report: dict, out_dir: Path) -> list[Path]:
             ["key", "scope", "issuetype", "status", "dev_days", "test_days",
              "ratio_test_vs_dev", "backfilled", "summary", "test_provenance",
              "testrail_runs", "testrail_window_days"],
-            [_devtest_row(e, "case_study") for e in dt["entries"]]
-            + [_devtest_row(e, "epic") for e in dt["epic_children"]]))
+            itertools.chain(
+                (_devtest_row(e, "case_study") for e in dt["entries"]),
+                (_devtest_row(e, "epic") for e in dt["epic_children"]))))
 
     paths.append(_write_csv(
         out_dir / f"{stem}_timeline.csv",

@@ -211,10 +211,12 @@ def _vsm_row(d: Deck, s, y, rows, *, label):
 
 
 def build(content: dict[str, str], out_path: Path) -> int:
-    """Render het deck. ÁLLE zichtbare tekst — inclusief de testertabel en de
+    """Render het deck. Alle *bewerkbare* tekst — inclusief de testertabel en de
     tijdlijnrijen — komt uit `content`, het bewerkbare checkpoint. `content` is
     bij het inladen over de standaardtekst heen gemerged, dus elke sleutel
-    bestaat; noch `data` noch `f` wordt nog voor tekst gelezen."""
+    bestaat; noch `data` noch `f` wordt nog voor tekst gelezen. Enige uitzondering:
+    de renderdatum in de titelvoet (`date.today()`) is bewust live, niet uit het
+    checkpoint — je wilt de datum van deze render, niet die van het checkpoint."""
     def C(k):
         return content.get(k, "")
     d = Deck()
