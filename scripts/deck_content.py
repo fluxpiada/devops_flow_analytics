@@ -24,6 +24,8 @@ ASSUMPTIONS = {
     "payback_rounds": 5,
     "freed_capacity": "1 tester",
     "bug_cost_weeks": 2,             # ±1 week fixen + ±1 week wachten op hertest
+    # get_users geeft 403; rollen zijn niet uit de data af te leiden.
+    "tester_role": "systeemtesters (aanname; BAT/key-usertests niet in TestRail)",
 }
 
 _NL_MONTHS = ("jan", "feb", "mrt", "apr", "mei", "jun",
@@ -45,13 +47,40 @@ def _period_label(first: str | None, last: str | None) -> str:
     return f"{ma}–{mb} {b.year}" if ma != mb else f"{ma} {b.year}"
 
 
-def _workdays(a: datetime, b: datetime) -> float:
+def _workday_span(a: datetime, b: datetime) -> float:
+    """Aantal werkdagen (ma–vr) dat het venster [a, b] beslaat, beide einddagen
+    meegeteld. Bewust een KALENDER-telling voor het tijdlijnlabel, NIET de
+    fractionele actieve-werkdag-maat van de engine (_workdays daar) — vandaar
+    een eigen naam."""
     days, cur = 0, a.date()
     while cur <= b.date():
         if cur.weekday() < 5:
             days += 1
         cur = date.fromordinal(cur.toordinal() + 1)
     return float(days)
+
+
+def _rows_to_pipe(rows: list[list]) -> str:
+    """Tabelrijen (lijst-van-lijsten) → pipe-tekst voor het checkpoint."""
+    return "\n".join("|".join(str(c) for c in row) for row in rows)
+
+
+def _clean_step(name: str) -> str:
+    """Bloklabel voor de tijdlijn: verwijder de verduidelijkende staarten."""
+    return name.replace(" (development)", "").replace(" / oplevering", "")
+
+
+def _vsm_rows(steps: list[dict]) -> str:
+    """Waardestroom-stappen → pipe-rijen voor het checkpoint, één stap per rij:
+    naam | actieve dagen | wachtdagen | ca_pct (of -) | aanname-marker (of leeg).
+    Zo staat élk cijfer en label op de tijdlijndia in deck_content.md."""
+    rows = []
+    for s in steps:
+        ca = str(s["ca_pct"]) if s.get("ca_pct") is not None else "-"
+        marker = "*" if "aanname" in (s.get("basis") or "").lower() else ""
+        rows.append([_clean_step(s["step"]), _r(s["active_days"]),
+                     _r(s["wait_days"]), ca, marker])
+    return _rows_to_pipe(rows)
 
 
 def _tester_table(per_tester: list[dict], tot_res: int) -> list[list]:
@@ -82,12 +111,15 @@ def facts(data: dict) -> dict:
 
     per_tester = sorted(ep["per_tester"].values(), key=lambda v: -v["results"])
     tot_res = sum(v["results"] for v in per_tester) or 1
-    testdagen = sum(v["active_days"] for v in per_tester)
+    # active_test_days wordt door de engine afgeleid; oudere JSONs missen het.
+    testdagen = ep.get("active_test_days")
+    if testdagen is None:
+        testdagen = sum(v["active_days"] for v in per_tester)
 
     window_wd = 0.0
     if rm.get("first_result") and rm.get("last_result"):
-        window_wd = _workdays(datetime.fromisoformat(rm["first_result"]),
-                              datetime.fromisoformat(rm["last_result"]))
+        window_wd = _workday_span(datetime.fromisoformat(rm["first_result"]),
+                                  datetime.fromisoformat(rm["last_result"]))
 
     exec_step = next((s for s in vs["steps"] if s["step"] == "Testuitvoering"), {})
 
@@ -114,15 +146,21 @@ def facts(data: dict) -> dict:
         window_sub = "doorlooptijd (eerste → laatste resultaat)"
 
     # De werkverdeling is alleen een verhaal als er meer dan één tester was.
+    # "Systeemtester" is een aanname (zie ASSUMPTIONS.tester_role): rollen zijn
+    # niet opvraagbaar en business-acceptatietests zitten niet in TestRail.
     n_testers = ep["testers"]
     top2 = _r(100 * sum(v["results"] for v in per_tester[:2]) / tot_res)
     if n_testers <= 1:
-        split_sentence = "Eén tester deed alle uitvoeringen — geen team."
+        split_sentence = "Eén systeemtester deed alle uitvoeringen — geen team."
     elif n_testers == 2:
-        split_sentence = f"Twee mensen deelden het werk ({top2}% samen)."
+        split_sentence = f"Twee systeemtesters deelden het werk ({top2}% samen)."
     else:
-        split_sentence = (f"Geen team van {n_testers}: twee mensen deden "
-                          f"{top2}% van de uitvoeringen.")
+        split_sentence = (f"Geen team van {n_testers} systeemtesters: twee "
+                          f"mensen deden {top2}% van de uitvoeringen.")
+
+    # De-facto regressie (cross-run pass→rerun-analyse); ontbreekt in oudere
+    # analyse-JSONs — dan blijft de dektekst ongewijzigd.
+    dfr = corpus.get("defacto_regression") or {}
 
     return {
         # koppeling
@@ -152,10 +190,16 @@ def facts(data: dict) -> dict:
         "wait_days": _r(tot["wait_days"]),
         "flow_pct": tot["flow_efficiency_pct"],
         "auto_lead_time": _r(auto["lead_time_days"]),
+        "vsm_rows_nu": _vsm_rows(vs["steps"]),
+        "vsm_rows_straks": _vsm_rows(auto["steps"]),
+        "vsm_has_assumption": any("aanname" in (s.get("basis") or "").lower()
+                                  for s in vs["steps"]),
         # suite / historie
         "cases_total": corpus.get("cases_total"),
         "cases_automated": corpus.get("cases_automated"),
         "cases_regression": n_cases,
+        "cases_defacto": dfr.get("cases_defacto"),
+        "defacto_overlap": dfr.get("overlap_titled_defacto"),
         "non_regr_min": min(non_regr), "non_regr_max": max(non_regr),
         "regr_min": min(regr), "regr_max": max(regr),
         "years_scanned": len(nr),
@@ -177,7 +221,11 @@ def default_content(f: dict) -> dict[str, str]:
              f"{f['cases_automated']} geautomatiseerd.\n".replace(",", "."))
     hist = ("" if not f["years_scanned"] else
             f"  - In {f['years_scanned']} jaar testhistorie zijn er per jaar "
-            f"{f['regr_min']}–{f['regr_max']} regressietests écht uitgevoerd.\n")
+            f"{f['regr_min']}–{f['regr_max']} regressietests écht uitgevoerd.\n"
+            + (f"  - Daarnaast functioneerden {f['cases_defacto']} testgevallen "
+               f"de facto als regressietest (opnieuw uitgevoerd na eerder "
+               f"slagen) — zonder dat label.\n"
+               if f.get("cases_defacto") else ""))
     hist_note = (f"+ {f['years_scanned']} jaar testhistorie" if f["years_scanned"]
                  else "zonder historie-scan (--skip-corpus)")
     build = ("40–80" if f["build_days_low"] is None else
@@ -199,7 +247,7 @@ def default_content(f: dict) -> dict[str, str]:
             f"- **Eén handmatige regressieronde kostte {f['testdagen']} testdagen "
             f"en besloeg {f['window_label']}.**\n"
             f"  - Gemeten aan {f['story_key']}: {f['tests']} testgevallen, "
-            f"{f['testers']} tester(s), {f['period']}.\n"
+            f"{f['testers']} systeemtester(s), {f['period']}.\n"
             "- **Wekelijks handmatig testen kan dus simpelweg niet.**\n"
             + hist + suite,
 
@@ -207,6 +255,12 @@ def default_content(f: dict) -> dict[str, str]:
         "tijdlijn.sub": "Blauw = werk · rood klokje = wachten · alles in werkdagen",
         "tijdlijn.nu": "NU — handmatig testen",
         "tijdlijn.straks": "STRAKS — met geautomatiseerde regressie",
+        # Elke tijdlijnstap staat hier als rij (naam|werk|wacht|ca%|*): bewerk
+        # ze en het deck volgt. Marker * = deels aanname (zie rapport §6b).
+        "tijdlijn.rijen_nu": f["vsm_rows_nu"],
+        "tijdlijn.rijen_straks": f["vsm_rows_straks"],
+        "tijdlijn.voet": ("* deels een aanname — zie het rapport §6b (kolom Basis)"
+                          if f["vsm_has_assumption"] else ""),
         "tijdlijn.bullets":
             f"- **Nu: {f['lead_time']} werkdagen van bouw tot oplevering — "
             f"{f['wait_days']} daarvan is wachten. Straks: {f['auto_lead_time']} "
@@ -220,11 +274,15 @@ def default_content(f: dict) -> dict[str, str]:
                       f"{f['period']}"),
         "ronde.kpi1": f"{f['window_label']}|{f['window_sub']}",
         "ronde.kpi2": f"{f['testdagen']} testdagen|totale inzet — "
-                      f"{f['testers']} tester(s)",
+                      f"{f['testers']} systeemtester(s)",
         "ronde.kpi3": f"{f['idle_days']} werkdagen|alles stil: wachten op bugfixes",
         "ronde.kpi4": (f"{f['defects']} bugs|gevonden"
                        + (f"; gemiddeld {f['defect_days']} dagen open"
                           if f["defect_days"] else "")),
+        "ronde.tabelkop": "Werkverdeling (geanonimiseerd):",
+        # De werkverdelingstabel als bewerkbare pipe-rijen (kop + testers), zodat
+        # óók deze cijfers via het checkpoint lopen i.p.v. live uit de JSON.
+        "ronde.tabel": _rows_to_pipe(f["tester_table"]),
         "ronde.bullets":
             f"- **{f['split_sentence']}**\n"
             f"- Elke test is gemiddeld {f['exec_per_test']}× uitgevoerd "
@@ -234,6 +292,7 @@ def default_content(f: dict) -> dict[str, str]:
 
         "rekensom.kop": "De rekensom op één A4",
         "rekensom.sub": "Alles in testdagen — aannames staan gemarkeerd",
+        "rekensom.kopregel": "|Vraag|Antwoord",
         "rekensom.rows":
             f"1|Wat kost één ronde handmatig?|{f['testdagen']} testdagen werk en "
             f"{f['window_label']} doorlooptijd (gemeten)\n"
@@ -283,7 +342,9 @@ def default_content(f: dict) -> dict[str, str]:
             "  - Kost niets, en maakt de volgende beslissing meetbaar in plaats "
             "van geschat.\n",
         "besluit.voet": ("Bijlage beschikbaar: volledige data-analyse (rapport + "
-                         "cijfers), reproduceerbaar uit Jira en TestRail."),
+                         "cijfers), reproduceerbaar uit Jira en TestRail. "
+                         "Business-acceptatietests (key users) zitten niet in "
+                         "de TestRail-data en vallen buiten deze metingen."),
     }
 
 

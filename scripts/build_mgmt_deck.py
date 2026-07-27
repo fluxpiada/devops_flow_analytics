@@ -38,11 +38,6 @@ LIGHT = RGBColor(0xE8, 0xF1, 0xFA)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 
-def _r(x: float) -> int:
-    """Ronde af op hele eenheden — managers lezen geen decimalen."""
-    return int(round(x))
-
-
 class Deck:
     def __init__(self):
         self.prs = Presentation()
@@ -146,9 +141,12 @@ class Deck:
         return len(self.prs.slides._sldIdLst)
 
 
-def _vsm_row(d: Deck, s, y, steps, *, label, active_key="active_days",
-             wait_key="wait_days", show_ca=True):
-    """Eén waardestroom-rij: blokken (werk) met klokjes (wachttijd) ertussen."""
+def _vsm_row(d: Deck, s, y, rows, *, label):
+    """Eén waardestroom-rij: blokken (werk) met klokjes (wachttijd) ertussen.
+
+    `rows` komt uit het bewerkbare checkpoint (deck_content, sleutel
+    tijdlijn.rijen_*): per stap [naam, werkdagen, wachtdagen, ca% of '-',
+    marker]. Zo bepaalt de bewerkte md élk label en getal op deze dia."""
     x = Inches(0.6)
     bw, gap = Inches(1.75), Inches(0.62)
     tf = d.box(s, Inches(0.6), y - Inches(0.42), Inches(6.0), Inches(0.35))
@@ -158,7 +156,13 @@ def _vsm_row(d: Deck, s, y, steps, *, label, active_key="active_days",
     r.font.size = Pt(15)
     r.font.bold = True
     r.font.color.rgb = DARK
-    for i, st in enumerate(steps):
+    for i, cells in enumerate(rows):
+        name = cells[0]
+        active = dc._r(float(cells[1])) if len(cells) > 1 and cells[1] else 0
+        wait = dc._r(float(cells[2])) if len(cells) > 2 and cells[2] else 0
+        ca_raw = cells[3] if len(cells) > 3 else "-"
+        ca = None if ca_raw in ("", "-") else int(float(ca_raw))
+        marker = cells[4] if len(cells) > 4 else ""
         blok = s.shapes.add_shape(5, x, y, bw, Inches(0.85))
         blok.fill.solid()
         blok.fill.fore_color.rgb = DARK
@@ -168,7 +172,7 @@ def _vsm_row(d: Deck, s, y, steps, *, label, active_key="active_days",
         pb = tfb.paragraphs[0]
         pb.alignment = PP_ALIGN.CENTER
         rb = pb.add_run()
-        rb.text = st["step"].replace(" (development)", "").replace(" / oplevering", "")
+        rb.text = name + (" *" if marker else "")
         rb.font.size = Pt(12)
         rb.font.bold = True
         rb.font.color.rgb = WHITE
@@ -177,21 +181,20 @@ def _vsm_row(d: Deck, s, y, steps, *, label, active_key="active_days",
         pa = tfa.paragraphs[0]
         pa.alignment = PP_ALIGN.CENTER
         ra = pa.add_run()
-        ra.text = f"{_r(st[active_key])} d werk"
+        ra.text = f"{active} d werk"
         ra.font.size = Pt(12)
         ra.font.bold = True
         ra.font.color.rgb = ACCENT
-        if show_ca and st.get("ca_pct") is not None:
+        if ca is not None:
             tfc = d.box(s, x, y + Inches(1.18), bw, Inches(0.3))
             pc = tfc.paragraphs[0]
             pc.alignment = PP_ALIGN.CENTER
             rc = pc.add_run()
-            rc.text = f"{st['ca_pct']}% goed"
+            rc.text = f"{ca}% goed"
             rc.font.size = Pt(11)
-            rc.font.color.rgb = RED if st["ca_pct"] < 90 else GREY
+            rc.font.color.rgb = RED if ca < 90 else GREY
         x += bw
-        if i < len(steps) - 1:
-            wait = st[wait_key]
+        if i < len(rows) - 1:
             klok = s.shapes.add_shape(9, x + Inches(0.08), y + Inches(0.16),
                                       Inches(0.46), Inches(0.46))
             klok.fill.solid()
@@ -201,17 +204,21 @@ def _vsm_row(d: Deck, s, y, steps, *, label, active_key="active_days",
             pw = tfw.paragraphs[0]
             pw.alignment = PP_ALIGN.CENTER
             rw = pw.add_run()
-            rw.text = f"{_r(wait)} d"
+            rw.text = f"{wait} d"
             rw.font.size = Pt(11)
             rw.font.color.rgb = RED if wait >= 5 else GREY
             x += gap
 
 
-def build(data: dict, content: dict[str, str], f: dict, out_path: Path) -> int:
-    """Render het deck. Elk stukje tekst komt uit `content`, elk getal uit `f`."""
-    vs = data["value_stream"]
-    auto = vs["automated_scenario"]
-    C = lambda k: content.get(k, "")          # noqa: E731 — korte lookup
+def build(content: dict[str, str], out_path: Path) -> int:
+    """Render het deck. Alle *bewerkbare* tekst — inclusief de testertabel en de
+    tijdlijnrijen — komt uit `content`, het bewerkbare checkpoint. `content` is
+    bij het inladen over de standaardtekst heen gemerged, dus elke sleutel
+    bestaat; noch `data` noch `f` wordt nog voor tekst gelezen. Enige uitzondering:
+    de renderdatum in de titelvoet (`date.today()`) is bewust live, niet uit het
+    checkpoint — je wilt de datum van deze render, niet die van het checkpoint."""
+    def C(k):
+        return content.get(k, "")
     d = Deck()
 
     # 1. titel
@@ -244,13 +251,25 @@ def build(data: dict, content: dict[str, str], f: dict, out_path: Path) -> int:
     tf = d.box(s, Inches(0.7), Inches(1.6), Inches(12.0), Inches(5.4))
     d.bullets(tf, dc.bullets(C("situatie.bullets")), size=22)
 
-    # 3. tijdlijn (waardestroom) — nu vs straks
+    # 3. tijdlijn (waardestroom) — nu vs straks. Rijen komen uit het checkpoint
+    # (bij het inladen over de standaardtekst gemerged, dus altijd aanwezig).
     s = d.slide()
     d.title(s, C("tijdlijn.kop"), C("tijdlijn.sub"))
-    _vsm_row(d, s, Inches(1.55), vs["steps"], label=C("tijdlijn.nu"))
-    _vsm_row(d, s, Inches(4.15), auto["steps"], label=C("tijdlijn.straks"))
-    tf = d.box(s, Inches(0.6), Inches(6.35), Inches(12.2), Inches(1.0))
+    _vsm_row(d, s, Inches(1.55), dc.pipe_rows(C("tijdlijn.rijen_nu")),
+             label=C("tijdlijn.nu"))
+    _vsm_row(d, s, Inches(4.15), dc.pipe_rows(C("tijdlijn.rijen_straks")),
+             label=C("tijdlijn.straks"))
+    tf = d.box(s, Inches(0.6), Inches(6.15), Inches(12.2), Inches(1.2))
     d.bullets(tf, dc.bullets(C("tijdlijn.bullets")), size=16)
+    voet = C("tijdlijn.voet")
+    if voet:
+        tfv = d.box(s, Inches(0.6), Inches(7.02), Inches(12.2), Inches(0.35))
+        pv = tfv.paragraphs[0]
+        rv = pv.add_run()
+        rv.text = voet
+        rv.font.size = Pt(11)
+        rv.font.italic = True
+        rv.font.color.rgb = GREY
 
     # 4. wat kost één ronde nu
     s = d.slide()
@@ -264,20 +283,21 @@ def build(data: dict, content: dict[str, str], f: dict, out_path: Path) -> int:
     tf = d.box(s, Inches(0.7), Inches(3.5), Inches(5.8), Inches(0.5))
     p = tf.paragraphs[0]
     r = p.add_run()
-    r.text = "Werkverdeling (geanonimiseerd):"
+    r.text = C("ronde.tabelkop")
     r.font.size = Pt(18)
     r.font.bold = True
     r.font.color.rgb = DARK
-    d.table(s, Inches(0.7), Inches(4.1), Inches(5.8), f["tester_table"],
-            col_w=[1, 1, 2.4], size=15)
+    d.table(s, Inches(0.7), Inches(4.1), Inches(5.8),
+            dc.pipe_rows(C("ronde.tabel")), col_w=[1, 1, 2.4], size=15)
     tf = d.box(s, Inches(7.0), Inches(4.1), Inches(5.8), Inches(2.8))
     d.bullets(tf, dc.bullets(C("ronde.bullets")), size=17)
 
     # 5. de rekensom
     s = d.slide()
     d.title(s, C("rekensom.kop"), C("rekensom.sub"))
+    kopregel = dc.pipe_rows(C("rekensom.kopregel"))
     d.table(s, Inches(0.7), Inches(1.5), Inches(11.9),
-            [["", "Vraag", "Antwoord"]] + dc.pipe_rows(C("rekensom.rows")),
+            kopregel + dc.pipe_rows(C("rekensom.rows")),
             col_w=[0.4, 3.6, 7.9], size=16)
     for x, key in ((Inches(0.7), "rekensom.kpi1"), (Inches(7.0), "rekensom.kpi2")):
         value, _, label = C(key).partition("|")
@@ -322,10 +342,16 @@ def main() -> None:
     ap.add_argument("--emit-content", action="store_true",
                     help="Schrijf deck_content.md en stop (checkpoint om te "
                          "bewerken vóór het renderen)")
-    ap.add_argument("--out", default=str(_OUT / "testauto_businesscase_mgmt.pptx"))
+    ap.add_argument("--out", default=None,
+                    help="Pad voor de .pptx (default: naast de gekozen JSON)")
     args = ap.parse_args()
 
-    matches = sorted(glob.glob(str(_OUT / "testauto_businesscase_*.json")))
+    # Artefacts live in per-key subdirs (output/<KEY>/…); keep the flat legacy
+    # location working too. Newest by mtime wins.
+    matches = sorted(
+        glob.glob(str(_OUT / "testauto_businesscase_*.json"))
+        + glob.glob(str(_OUT / "**" / "testauto_businesscase_*.json")),
+        key=lambda p: Path(p).stat().st_mtime)
     if not args.json and not matches:
         raise SystemExit(f"Geen analyse-JSON gevonden in {_OUT}/ — draai eerst "
                          f"testauto_businesscase.py, of geef --json op.")
@@ -335,23 +361,30 @@ def main() -> None:
         raise SystemExit(f"{path} bevat geen value_stream — draai eerst "
                          f"scripts/testauto_businesscase.py opnieuw.")
 
+    # Artefacts land next to the JSON they belong to (per-key subdir).
+    json_dir = Path(path).parent
     f = dc.facts(data)
     if args.emit_content:
-        out = _OUT / "deck_content.md"
+        out = json_dir / "deck_content.md"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(dc.to_md(dc.default_content(f), f), encoding="utf-8")
         print(f"✓ {out} — bewerk en render met --content {out}")
         return
 
     if args.content:
-        content = dc.parse_md(Path(args.content).read_text(encoding="utf-8"))
+        # Merge de bewerkte tekst over de standaard, zodat elke sleutel bestaat
+        # (oude checkpoints die nieuwe sleutels missen vallen zo terug).
+        edited = dc.parse_md(Path(args.content).read_text(encoding="utf-8"))
+        content = {**dc.default_content(f), **edited}
         src = f"tekst: {Path(args.content).name}"
     else:
         content = dc.default_content(f)
         src = "tekst: afgeleid uit JSON"
 
-    n = build(data, content, f, Path(args.out))
-    print(f"✓ {args.out} — {n} slides "
+    out_path = Path(args.out) if args.out else \
+        json_dir / "testauto_businesscase_mgmt.pptx"
+    n = build(content, out_path)
+    print(f"✓ {out_path} — {n} slides "
           f"(data: {Path(path).name} · {src} · {f['story_key']}/run {f['run_id']})")
 
 
