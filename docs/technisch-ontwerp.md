@@ -118,8 +118,26 @@ over alle testers, is de **persoonstestdag** — de rekeneenheid van de business
 
 ## 4. Corpus / frequentie — `build_corpus()` *(over te slaan met `--skip-corpus`)*
 
-`get_runs/{project}?suite_id=` en dan per run `get_tests`. Duurt ~7 minuten over
-394 runs; de rest van de analyse werkt ook zonder.
+`get_runs/{project}?suite_id=` en dan per run `get_tests`; daarnaast eenmalig
+`get_cases`, `get_statuses`, `get_sections` en `get_plans` (alleen een telling — zie
+de kanttekening onder §4b). Duurt ~7 minuten over 394 runs; de rest van de analyse
+werkt ook zonder.
+
+**Cache — waarom, stap voor stap.** (1) De 7 minuten zitten volledig in de
+per-run `get_tests`-lus; de losse metadata-calls zijn verwaarloosbaar. (2)
+Diezelfde opgehaalde testdata beantwoordt méér dan één vraag — frequentie,
+de-facto regressie (§4b), testfase-provenance (§6) — maar werd vroeger na het
+tellen weggegooid, zodat elke nieuwe vraag een nieuwe scan van 7 minuten kostte.
+(3) Door de ruwe fetch te cachen scheiden we *meten* van *interpreteren*:
+`fetch_corpus_raw()` haalt op (bewaart per test `case_id`/`title`/`status_id`/
+`refs`), `_analyse_corpus()` rekent puur (geen API) — dus een nieuwe drempel of
+classifier her-analyseren is offline, reproduceerbaar en gratis. (4) De cache
+wordt gevalideerd op `CORPUS_CACHE_VERSION` + project + suite, en geweigerd als
+hij op `--max-runs` gecapt was terwijl een run méér wil — zo analyseer je nooit
+per ongeluk de verkeerde suite. Bestand:
+`output/corpus_cache_p<project>_s<suite>.json`; `--refresh-corpus` forceert een
+verse scan, `--corpus-cache PATH` wijst een ander bestand aan, ouder dan ~7 dagen
+geeft een waarschuwing. De 7-minuten-scan betaal je dus één keer per verversing.
 
 **Uitgevoerd, niet gepland.** `status_id == 3` is TestRail's `untested`: de test is
 aangemaakt maar nooit gedraaid. Alles wordt geteld als `status_id != 3`. Dit is geen
@@ -133,6 +151,48 @@ bevat. Ook per testgeval in de suite (`get_cases`) → `cases_regression_titled`
 
 **Automatiseringsgraad.** `custom_automation_type == 1` (Ranorex) over alle cases:
 1 van 2.868.
+
+### 4b. De-facto regressie — `build_defacto_regression()`
+
+**Waarom dit nodig is, en wat het aan nauwkeurigheid verandert.** De getitelde
+telling (4/4/17/37 uitgevoerde regressietests per jaar) meet *naamgeving*, niet
+*gedrag* — en onderschat daarmee de werkelijke regressiepraktijk. Op zichzelf zou
+die telling een verkeerde conclusie steunen ("er bestaat vrijwel geen
+regressiepraktijk"). De pass→rerun-detectie meet gedrag en corrigeert dat: bij
+het incassoproces blijken 128 cases de-facto regressiegedrag te vertonen tegen 80
+getitelde, met een overlap van 1 — de gelabelde en de feitelijke set zijn vrijwel
+disjunct. Effect op de analyse: het ROI-model krijgt een derde, gedragsgebaseerde
+scope (~115 exec/jaar naast de ~71 getitelde), en de bevinding "overlap 1 van 80"
+maakt zichtbaar dat de gelabelde telling het verhaal niet mag dragen. Het blijft
+een **ondergrens** (plan-runs onzichtbaar, in-run hertests samengevouwen — zie
+onder). Zie ook de Begrippen-sectie in het rapport (ISTQB `regression testing`):
+de-facto regressie is gedragsmatig exact die definitie, alleen zonder het label.
+
+Mechanisch — de detectie leest gedrag i.p.v. naamgeving, uit de gecachte
+case-level corpus (zelfde API-calls, geen extra kosten):
+
+1. Runs op `(created_on, id)` geordend; per `case_id` de lijst uitgevoerde
+   verschijningen over runs (`status_id != 3`).
+2. Per verschijning ná de eerste: was de laatst bekende uitkomst **passed**, dan is
+   het een **pass→rerun** (iets dat al werkte opnieuw draaien = verificatie na
+   wijziging — regressiegedrag). Na fail/retest/blocked telt het als defect-gedreven
+   hertest. Custom statussen komen in `unknown_status_executions`, nooit stilzwijgend
+   in een van beide bakken.
+3. **De-facto regressiecase** = ≥1 pass→rerun. Daarnaast als corroboratie:
+   `cases_recurrent` (uitgevoerd in ≥`--recurrence-min` runs, default 3), distinct
+   milestones en distinct Jira-refs per case (dezelfde test onder verschillende
+   stories hergebruikt is zelf een regressiesignaal).
+
+Uitvoer: `corpus.defacto_regression` (tellingen, per-jaar pass→rerun/hertest-reeksen,
+top-20 + volledige caselijst) → rapport §5b, kolommen in §5 en §7, CSV
+`_defacto_regression.csv`, en ROI-scope `defacto_regression` (§8). In het rapport is
+de business-implicatie bewust een **scenario, geen claim**.
+
+Twee precisiegrenzen, in het rapport zelf ook genoemd: `get_tests` levert per run
+alleen de **eindstatus** (een in-run fail→pass leest als "passed" — de classificatie
+gebruikt de laatst bekende uitkomst, wat precies is wat de volgende run zag), en
+`get_runs` toont **geen runs bínnen testplannen** — vandaar de `get_plans`-telling;
+het de-facto volume is een ondergrens.
 
 ---
 
@@ -172,6 +232,21 @@ Drie correcties die het cijfer bruikbaar maken:
   `n_resolved_without_testing_phase` — bij S34-2907 waren dat er 5, waaronder de
   W010-story. De werkelijke test:dev-verhouding ligt dus hóger dan de gemeten 1,33.
 
+**Testfase-provenance (met corpus) — wat het is en waarom het telt.**
+"Provenance" = *welk systeem het testen heeft geregistreerd*. Het probleem: vijf
+afgeronde stories hebben nul dagen Jira-teststatus; zónder provenance lezen die
+als "niet getest", wat de test:dev-ratio en het datakwaliteitsbeeld van §8
+vertekent. De oplossing: het corpus levert `run_jira_keys` (per Jira-key de
+TestRail-runs die hem in `refs`/naam noemen), en elk issue krijgt een label
+`test_provenance` — `jira_status` (>0,1 d In testing) · `testrail_inferred` (geen
+Jira-teststatus, wél runs op de key — met `testrail_runs` en een kalendervenster
+`testrail_window_days` uit run-datums) · `none`. Het `testrail_inferred`-label
+bewíjst dat er getest is (er verwijzen runs naar de story), ook al legde Jira het
+niet vast — dus "geen status" ≠ "niet getest", en het rapport kan het aandeel
+noemen in plaats van te gissen. De afgeleide vensters tellen **niet** mee in de
+ratio zelf (die blijft een zuivere Jira-meting). Split in
+`ratio_summary.test_provenance_split`, rapport §8, kolommen in `_devtest.csv`.
+
 **Hertest-wachttijd.** Per resultaat met een defect wordt vooruit gezocht naar het
 eerstvolgende resultaat op dezelfde test met `status_id == 1` (passed); het verschil
 is de hertest-gap. Mediaan bij run 26442: 7,9 dagen.
@@ -197,11 +272,15 @@ Het geautomatiseerde scenario laat de stappen staan maar zet testuitvoering op
 1 actieve dag (draaien is automatisch; beoordelen blijft) en de hertest-wachttijd op
 1 dag.
 
-> **Twee harde aannames.** `build_active = venster × 0,8` — er is geen registratie van
-> hoeveel er in het bouwvenster daadwerkelijk aan is gewerkt. En de
-> testvoorbereiding wordt geschat als 20% van de doorlooptijd van subtaken waarvan de
-> titel `voorbereid`, `bestaalstapel` of `testdata` bevat, met 3,0 dagen als terugval
-> en begrensd op de venstergrootte. Dat is een heuristiek, geen meting.
+> **De stapaannames staan centraal in `STEP_ASSUMPTIONS`** (`prep_active_fraction`
+> 0,20 · `prep_fallback_days` 3,0 · `bugfix_active_days_per_retest` 0,5 ·
+> `closure_active_days` 1,0), naast `FTE_FACTOR` 0,8 voor de bouw. Elke stap draagt
+> een **`basis`-label** — `gemeten` (testuitvoering, uit result-timestamps),
+> `afgeleid` (gemeten venster × aanname) of `aanname:<sleutel>` — dat in rapport
+> §6b als kolom "Basis" verschijnt. De prep-schatting gebruikt het gemeten
+> subtaakvenster (titels met `voorbereid`/`bestaalstapel`/`testdata`) waar dat
+> bestaat en valt anders terug op de vaste 3,0 dagen; welk pad gold, staat in het
+> label. Heuristiek blijft heuristiek — maar nu per regel zichtbaar.
 
 ---
 
@@ -211,17 +290,27 @@ Anker: de gepoolde mediaan van de sessiegaten uit §3 (8,3 min voor run 26442).
 Bandbreedte daaromheen: ×0,75 / ×1,5 / ×2,0 — **gevoeligheidsanalyse, geen meting**,
 bedoeld om de denk- en opstarttijd te dekken die de gatenmethode niet ziet.
 
-Vaste modelparameters:
+Vaste modelparameters, elk met zijn **basis** (industriereferentie / lokale
+inschatting die de pilot vervangt / organisatieconventie) — voluit in rapport
+§11.5, hier samengevat:
 
-| Parameter | Waarde |
-|---|---|
-| Bouwinspanning per testgeval | 2 / 4 / 8 uur |
-| Onderhoud per jaar | 20% van de bouwinspanning |
-| Restinspanning na automatisering | 10% (triage, supervisie) |
+| Parameter | Waarde | Basis |
+|---|---|---|
+| Bouwinspanning per testgeval | 2 / 4 / 8 uur | lokale inschatting (→ pilot) |
+| Onderhoud per jaar | 20% van de bouwinspanning | industrie: 10–30% gangbaar |
+| Restinspanning na automatisering | 10% (triage, supervisie) | lokale inschatting |
+| Minuten/executie-banden | anker ×0,75 / ×1,5 / ×2,0 | lokale gevoeligheidsband |
+| Actieve bouwtijd | 0,8 FTE | organisatieconventie |
 
-Twee scopes worden doorgerekend — `regression_subset` en `whole_suite` — omdat de
-regressie-subset alléén te dun is om op te bouwen. Het lopende jaar wordt
-geannualiseerd op basis van de dagen die verstreken zijn.
+De meeste parameters zijn géén industrienorm; het rapport zegt dat expliciet in
+plaats van autoriteit te suggereren.
+
+Drie scopes worden doorgerekend — `regression_subset`, `whole_suite` en (wanneer de
+de-facto-analyse van §4b beschikbaar is) `defacto_regression`, gevoed door de
+pass→rerun-executies per jaar — omdat de regressie-subset alléén te dun is om op te
+bouwen. De de-facto-scope is nadrukkelijk een scenario: hij kwantificeert wat er te
+winnen valt áls de ongelabelde her-uitvoeringen inderdaad verificatiewerk waren.
+Het lopende jaar wordt geannualiseerd op basis van de dagen die verstreken zijn.
 
 Daarnaast `target_cadence_scenarios`: wekelijks (52×) en per sprint (17×), met één
 uitvoering per testgeval per ronde. Dit is het beslissende scenario — bij de
@@ -231,8 +320,9 @@ historische cadans (4/4/17/37 per jaar) verdient automatisering zich nooit terug
 
 ## 9. Rapport en artefacten — `render_report_md()` / `write_outputs()`
 
-Zeven bestanden per run: JSON + `report.md` + CSV's voor runs, defects, timeline,
-W-stappen en dev:test.
+Acht bestanden per run: JSON + `report.md` + CSV's voor runs, defects, timeline,
+W-stappen, dev:test en (met corpus) de-facto-regressiecases
+(`_defacto_regression.csv`, één rij per case met pass→rerun-gedrag).
 
 `§0 "De kern"` leidt alles af uit de meting — persoonstestdagen, testvenster (onder
 twee weken in werkdagen, daarboven in weken), stilstand, doorlooptijd, bouwdagen uit
@@ -280,13 +370,16 @@ De belangrijkste tabel in dit document.
 | Uitvoeringen, first-pass, testvenster, testdagen | **gemeten** | TestRail resultaten |
 | Defects en oplostijd | **gemeten** | `result.defects` → Jira |
 | Runs/jaar, uitgevoerde tests/jaar, automatiseringsgraad | **gemeten** | TestRail corpus |
+| De-facto regressiecases, pass→rerun-executies | **afgeleid** | cross-run eindstatussen (§4b); ondergrens door onzichtbare plan-runs |
+| Testfase-provenance (jira_status / testrail_inferred / none) | **afgeleid** | Jira-status + `run_jira_keys` uit run-refs (§6) |
 | Wijzigingsdruk per W-stap | **gemeten** | Jira JQL op `summary` |
 | Netto actieve uren | **ondergrens** | sessiegaten ≤ 60 min |
 | Minuten per uitvoering (banden) | **aanname** | anker ×0,75 / ×1,5 / ×2,0 |
 | Bouwinspanning per testgeval | **aanname** | 2/4/8 uur, geen pilotdata |
 | Onderhoud 20%/jaar, restinspanning 10% | **aanname** | modelparameters |
 | Actieve bouwtijd (0,8 FTE) | **aanname** | geen registratie |
-| Testvoorbereiding | **heuristiek** | 20% van subtaakduur, terugval 3,0 d |
+| Waardestroom-stappen prep/bugfix/afronding | **aanname/heuristiek** | `STEP_ASSUMPTIONS`; per stap gelabeld in §6b (kolom Basis) |
+| Testerrol (systeemtester) | **aanname** | `get_users` 403; BAT valt buiten TestRail-data |
 | Bespaarde testdagen per ronde (±13), rondes tot terugverdiend (±5) | **aanname** | `deck_content.ASSUMPTIONS`, herkomst niet te reconstrueren |
 
 ---
@@ -300,8 +393,10 @@ De belangrijkste tabel in dit document.
    waardestroom (zichtbaar bij KFDO-1024).
 3. **W-codeherkenning is incasso-specifiek**, en de regex verschilt tussen modules
    (zie §5).
-4. **`get_users` geeft 403.** De rolverdeling over testers (professioneel tester versus
-   business/FAM key user) is daardoor niet vast te stellen.
+4. **Testerrollen zijn een aanname.** `get_users` geeft 403, dus rollen zijn niet uit
+   de data af te leiden. Werk-aanname: alle TestRail-testers zijn **systeemtesters**;
+   business-acceptatietests (BAT/key-usertests) zitten níet in de TestRail-data en
+   vallen buiten elke meting in deze analyse.
 5. **Runs worden zelden afgesloten.** 96% van de runs heeft geen `completed_on`, dus
    "open → gesloten" is als doorlooptijdmaat onbruikbaar; vandaar eerste → laatste
    resultaat.
@@ -309,3 +404,10 @@ De belangrijkste tabel in dit document.
    1 tester, geen hertests) maar een wijzigingstest. De volledige procesregressie is
    feitelijk één keer gedraaid — wat de enabler-redenering versterkt, maar betekent dat
    er geen tweede meetpunt is.
+7. **Runs bínnen testplannen zijn onzichtbaar.** `get_runs` toont ze niet; ze worden
+   alleen geteld via `get_plans`. Corpus- en de-facto-volumes zijn daardoor
+   ondergrenzen.
+8. **Eindstatus per run.** `get_tests` kent geen resultaathistorie; een in-run
+   fail→pass leest als "passed". De de-facto-classificatie gebruikt daarom de laatst
+   bekende uitkomst — precies wat de eerstvolgende run zag — maar in-run hertests
+   blijven er onzichtbaar (die meet §3 alleen voor de case-study-run).

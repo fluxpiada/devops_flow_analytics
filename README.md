@@ -1,18 +1,73 @@
-# devops_flow
+# devops_flow — business case testautomatisering
 
-Meet doorlooptijd, inspanning en flow-efficiëntie van ontwikkel- en testwerk,
-op basis van wat Jira en TestRail al registreren. Geen urenregistratie nodig.
+Meet doorlooptijd, inspanning en flow-efficiëntie van ontwikkel- en testwerk op
+basis van wat Jira en TestRail al registreren — géén urenregistratie nodig — en
+zet dat om in een onderbouwd beslisrapport (Markdown + Word) en een
+managementdeck (PowerPoint).
 
-## Wat het meet
+## De vraag, en het antwoord
 
-- **Levenscyclus** — statusovergangen per story en subtaak uit de Jira-changelog.
-- **Testuitvoering** — uitvoeringen per testgeval, first-pass-rate en testdagen
-  per tester, uit de TestRail-resultaathistorie.
-- **Defect-lus** — gevonden bugs, oplostijd (Jira) en hertest-wachttijd (TestRail).
-- **Waardestroom** — per processtap actieve tijd vs wachttijd, plus
-  flow-efficiëntie; inclusief een geautomatiseerd scenario.
-- **Wijzigingsdruk** — hoe vaak elke processtap wordt geraakt door wijzigingen,
-  als onderbouwing voor de onderhoudslast van een geautomatiseerde testset.
+**Vraag:** moeten we het (regressie)testen van het incassoproces automatiseren?
+
+**Antwoord in drie zinnen.** Eén handmatige regressieronde kost tientallen
+persoonstestdagen en beslaat weken, terwijl die uren nu nauwelijks gemaakt
+worden — regressie draait zelden. Het team wil het proces refactoren en moet
+daarvoor wekelijks kunnen regressietesten, wat handmatig fysiek onmogelijk is.
+De business case is dus geen besparingscase op bestaande uren maar een
+**enabler-case**: automatisering maakt de kwaliteitsborging mogelijk die de
+verbouwing van het incassoproces vereist.
+
+Elk getal in het rapport is herleidbaar tot Jira of TestRail, of expliciet als
+aanname gelabeld. Het rapport (`_report.md` / `.docx`) is het hoofddocument; het
+deck is de management-samenvatting.
+
+## Begrippen (kort — het rapport definieert ze voluit, bron: ISTQB Glossary)
+
+- **Regressietest** — opnieuw testen ná een wijziging om te bewaken dat wat
+  wérkte blíjft werken.
+- **Hertest / confirmatietest** — een gefaalde test opnieuw draaien ná de
+  bugfix. Dit is géén regressietest.
+- **Wijzigingstest (non-regressie)** — valideert dat nieuwe/gewijzigde
+  functionaliteit werkt; bewijst niet dat het bestaande intact bleef.
+- **De-facto regressietest** — eigen operationele term: een testgeval dat
+  opnieuw is uitgevoerd terwijl het eerder slaagde (pass→rerun) —
+  regressiegedrag zonder het label.
+- **Persoonstestdag** — één tester, één werkdag testen. De rekeneenheid.
+- **Flow-efficiëntie** — actieve tijd gedeeld door doorlooptijd (Lean/SAFe).
+
+## Methode in het kort
+
+De analyse is een keten; elke stap staat op zichzelf en draagt zijn eigen
+verantwoording (rapport §11, `docs/technisch-ontwerp.md`):
+
+1. **Koppeling** — de story wordt uit de `refs`/naam van de TestRail-run
+   afgeleid; klopt een opgegeven `--jira` niet, dan stopt het script (anders is
+   het resultaat consistent maar onjuist).
+2. **Jira-levenscyclus** — statusovergangen van story + subtaken uit de
+   changelog → tijd-per-status en fasegrenzen.
+3. **TestRail-executie** — her-executies per test, first-pass-rate, en een
+   effort-proxy uit de tijdstempels tussen resultaten (er zijn geen uren
+   geregistreerd).
+4. **Corpus + cache** — één suite-brede scan van alle runs (frequentie,
+   automatiseringsgraad), gecachet zodat de analyse daarna offline draait.
+5. **De-facto regressie** — cross-run pass→rerun-detectie: maakt de ongelabelde
+   regressiepraktijk zichtbaar.
+6. **Waardestroom** — per stap actieve tijd vs wachttijd → flow-efficiëntie, met
+   een geautomatiseerd scenario ernaast.
+7. **ROI-model** — gevoeligheidsbanden i.p.v. schijnprecisie; een doelcadans
+   (wekelijks / per sprint) als beslissend scenario.
+
+## Artefacten per run
+
+Alles landt in **`output/<JIRA-KEY>/`** (één onderzoek = één map):
+
+- `…_report.md` en `…_report.docx` — het beslisrapport (Word via pandoc, indien
+  aanwezig).
+- `…json` — alle cijfers, herbruikbaar.
+- CSV's — `runs`, `defects`, `timeline`, `wsteps`, `devtest`, en (met corpus)
+  `defacto_regression`.
+- met `--deck`: `deck_content.md` (bewerkbaar checkpoint) +
+  `testauto_businesscase_mgmt.pptx`.
 
 ## Gebruik
 
@@ -20,42 +75,54 @@ op basis van wat Jira en TestRail al registreren. Geen urenregistratie nodig.
 uv sync
 
 # analyse van één testrun (snel, zonder historie-scan)
-# de Jira-story wordt afgeleid uit de refs van de run
 uv run python scripts/testauto_businesscase.py --run 26442 --skip-corpus
 
-# volledig, inclusief frequentie-historie van de hele suite (~7 min)
+# volledig: frequentie-historie van de hele suite
+# (~7 min de eerste keer; daarna seconden uit de corpus-cache)
 uv run python scripts/testauto_businesscase.py --run 26442
 
-# managementdeck uit de laatste analyse
-uv run python scripts/build_mgmt_deck.py
+# alles in één commando: data + rapport + Word + deck
+uv run --with python-pptx python scripts/testauto_businesscase.py --run 26442 --deck
+
+# managementdeck los uit de laatste analyse (bewerk-checkpoint → render)
+uv run --with python-pptx python scripts/build_mgmt_deck.py --emit-content
+uv run --with python-pptx python scripts/build_mgmt_deck.py --content output/<KEY>/deck_content.md
 ```
 
-Geef je zelf `--jira KEY` op, dan wordt die gecontroleerd tegen de `refs` en de naam
-van de run. Klopt de koppeling niet, dan stopt het script: de analyse plakt de
-levenscyclus van één story op de uitvoeringsdata van één run, en zonder koppeling is
-het resultaat wel consistent maar onjuist.
+### Andere dataset dan het incassoproces
 
-Output komt in `output/`: een JSON met alle cijfers, CSV's (runs, defects,
-tijdlijn, W-stappen, dev/test) en een Markdown-rapport.
+De tool is niet aan de incasso-seed gebonden:
+
+| Wat je wilt | Optie |
+|---|---|
+| Andere story/run | `--jira KEY --run ID` (of alleen `--run`, story uit de refs) |
+| Andere workflow-statusnamen | `--status-dev "In Progress" --status-test "In testing"` |
+| Andere projecten voor wijzigingsdruk | `--jql-projects "S34, KFDO"` (default: prefix van de story) |
+
+De W-code-herkenning voor processtappen is incasso-specifiek; voor een ander
+domein blijven die tabellen leeg en staat de rest gewoon.
 
 ### Handige opties
 
 | Wat je wilt | Optie |
 |---|---|
-| Historie-scan overslaan (veel sneller) | `--skip-corpus` |
-| Andere Jira-projecten voor wijzigingsdruk | `--jql-projects "S34, KFDO, ITS"` |
-| Portfolio-analyse via een specifiek epic | `--epic KFDO-123` |
+| Historie-scan overslaan | `--skip-corpus` |
+| Corpus-cache negeren en vers scannen | `--refresh-corpus` |
+| Ander cachebestand | `--corpus-cache PATH` |
+| Drempel "terugkerende case" (de-facto) | `--recurrence-min 3` |
+| Portfolio-analyse via een epic | `--epic KFDO-123` |
 | Historie-scan beperken | `--max-runs 20` |
 | Ander pad naar credentials | `--creds ../fo_doc_gen/creds.yaml` |
 | Doorgaan zonder Jira-koppeling | `--allow-unlinked` |
 
-De dektekst kun je nalopen vóór het renderen:
+De corpus-cache is suite-gebonden (`output/corpus_cache_p<project>_s<suite>.json`)
+en wordt door elke story op die suite gedeeld. Word-export vraagt `pandoc`;
+ontbreekt dat, dan print het script het handmatige commando
+(`pandoc <report>.md --from gfm -o <report>.docx`) en gaat door.
 
-| Wat je wilt | Optie op `build_mgmt_deck.py` |
-|---|---|
-| Tekst als bewerkbaar bestand | `--emit-content` → `output/deck_content.md` |
-| Renderen uit die bewerkte tekst | `--content output/deck_content.md` |
-| Ander analysebestand | `--json output/testauto_businesscase_<ts>.json` |
+Het deck komt volledig uit `deck_content.md`: élke tekst, tabel en tijdlijnstap
+staat als bewerkbare regel in dat checkpoint. Bewerk het en render met
+`--content`; niets zit meer hardcoded in de renderer.
 
 ## Credentials
 
@@ -72,30 +139,30 @@ gebruikt Basic auth met een API-key.
 - `cases/incasso_2026/` — business case testautomatisering incassoproces:
   rapport, managementdeck en brondata.
 
-## Beperkingen
+## Beperkingen en aannames
 
-Deze zijn bewust expliciet, omdat ze de interpretatie van de cijfers bepalen.
+Bewust expliciet, want ze bepalen de interpretatie. Het rapport (§11.5) geeft per
+aanname de **basis**: industriereferentie, lokale inschatting (te vervangen door
+pilotmeting), of organisatieconventie. De meeste modelparameters zijn géén
+industrienorm — dat staat er ook zo.
 
 - **Uren worden nergens geregistreerd** (geen worklogs, geen estimates, TestRail
-  `elapsed` vrijwel leeg). Inspanning is afgeleid uit timestamps en is daarmee
-  een **ondergrens**; het ROI-model rekent met expliciete aannamebanden.
-- **De waardestroom leest de statussen `In Progress` en `In testing`.** Stories
-  die de teststatus niet doorlopen — en dat komt voor — geven een onvolledige
-  tijdlijn. Dat is zelf een bevinding: testwerk wordt vaak niet op story-niveau
-  geregistreerd.
-- **De W-code-herkenning voor processtappen is specifiek voor het incassoproces.**
-  Voor een ander domein werkt de rest wel, maar vind je geen processtappen.
-- **`get_users` van TestRail geeft 403.** De rolverdeling over testers
-  (professioneel tester versus business/FAM key user) is daardoor niet uit de data
-  vast te stellen.
-- **De argumentatie in het deck blijft een redenering.** Alle getallen worden
-  afgeleid uit de analyse, maar de strekking is geschreven voor één beslissing.
-  Loop de tekst na met `--emit-content` voordat je hem aan een ander publiek toont;
-  wat níét uit de data volgt staat in `deck_content.ASSUMPTIONS`.
+  `elapsed` vrijwel leeg). Inspanning is afgeleid uit timestamps en is een
+  **ondergrens**; het ROI-model rekent met expliciete aannamebanden.
+- **De waardestroom leest twee workflow-statussen** (default `In Progress` /
+  `In testing`, override met `--status-dev/--status-test`). Stories die de
+  teststatus niet doorlopen geven een onvolledige tijdlijn — zelf een bevinding.
+- **De W-code-herkenning is incasso-specifiek.**
+- **Alle TestRail-testers gelden als systeemtesters (aanname).** `get_users`
+  geeft 403. **Business-acceptatietests (BAT/key-usertests) zitten níet in de
+  TestRail-data** en vallen buiten elke meting.
+- **De de-facto-regressiedetectie leest eindstatussen per run** (in-run
+  fail→pass leest als "passed") en ziet geen runs bínnen testplannen — de
+  volumes zijn ondergrenzen.
 
 ## Verantwoording
 
 [`docs/technisch-ontwerp.md`](docs/technisch-ontwerp.md) beschrijft de keten in
 volgorde: welke call, welk veld, welke afleiding, welke aanname — inclusief een
-tabel die per grootheid aangeeft of hij **gemeten**, **afgeleid** of **aangenomen**
-is.
+tabel die per grootheid aangeeft of hij **gemeten**, **afgeleid** of
+**aangenomen** is, en waaróm elke stap zo werkt.
