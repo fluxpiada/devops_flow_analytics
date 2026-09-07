@@ -191,6 +191,20 @@ volledige changelog-fetch meer kost.
 het project), niet uit een hardgecodeerde lijst statusnamen — dit script deelt
 dus niet de `--status-dev/--status-test`-beperking van de business case.
 
+### Zelftest
+
+Het rekenwerk waar een fout stil doorwerkt in het rapport — feestdagen,
+werkdagenduur, percentielen, het parsen van sprintstrings, bulk-detectie — staat
+onder een offline zelftest. Geen netwerk, geen creds, geen cache:
+
+```bash
+uv run python scripts/selftest_flow.py        # stil bij succes
+uv run python scripts/selftest_flow.py -v     # toont elke check
+```
+
+Draai hem na elke wijziging in `jira_core.py` of `jira_flow_analysis.py`.
+Exitcode 0 = alles goed, 1 = er faalde iets.
+
 ## Credentials
 
 Zet een `creds.yaml` in de repo (gitignored) of laat het script terugvallen op
