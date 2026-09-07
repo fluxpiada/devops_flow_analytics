@@ -20,7 +20,6 @@ the test-window provenance (§8).
 from __future__ import annotations
 
 import argparse
-import csv
 import itertools
 import json
 import re
@@ -29,24 +28,24 @@ import statistics
 import subprocess
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import requests
-import urllib3
-import yaml
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 _HERE = Path(__file__).resolve().parent
-
-# Waar creds.yaml gezocht wordt als --creds niet is opgegeven. De laatste
-# entry deelt het secret met fo_doc_gen zodat het niet gedupliceerd hoeft.
-_CREDS_CANDIDATES = (
-    Path.cwd() / "creds.yaml",
-    _HERE / "creds.yaml",
-    _HERE.parent / "creds.yaml",
-    Path.home() / "github_repos" / "fo_doc_gen" / "creds.yaml",
+sys.path.insert(0, str(_HERE))
+from jira_core import (  # noqa: E402 — naast dit script
+    JiraClient,
+    _dt,
+    _find_creds,
+    _is_backfilled,
+    _load_creds,
+    _md_table,
+    _status_transitions,
+    _time_in_status,
+    _workdays,
+    _write_csv,
 )
 
 # Gaps between a tester's consecutive result submissions larger than this are
@@ -131,60 +130,7 @@ def resolve_story_key(run: dict, requested: str | None,
         f"{declared[0] if declared else '<KEY>'}, of --allow-unlinked als je "
         f"zeker weet dat de koppeling klopt.")
 
-# ── clients ──────────────────────────────────────────────────────────────────
-
-
-def _find_creds() -> Path | None:
-    for cand in _CREDS_CANDIDATES:
-        if cand.exists():
-            return cand
-    return None
-
-
-def _load_creds(path: Path | None) -> dict:
-    if path and path.exists():
-        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return {}
-
-
-class JiraClient:
-    """Minimal Jira Data Center client (Bearer PAT, self-signed cert)."""
-
-    def __init__(self, creds: dict):
-        j = creds.get("jira") or {}
-        self.headers = {"Authorization": f"Bearer {j.get('api_token', '')}"}
-        self.base = self._resolve_base(j.get("base_url", "https://jira.vitens.lan"))
-
-    def _resolve_base(self, configured: str) -> str:
-        # creds.yaml carries the host without the servlet context path; the
-        # working REST root on this instance is https://<host>/jira.
-        root = configured.rstrip("/")
-        for cand in (root, f"{root}/jira"):
-            try:
-                r = requests.get(f"{cand}/rest/api/2/serverInfo",
-                                 headers=self.headers, verify=False, timeout=15)
-                if r.status_code == 200:
-                    return cand
-            except requests.RequestException:
-                continue
-        return root
-
-    def issue(self, key: str, expand: str = "changelog") -> dict:
-        r = requests.get(f"{self.base}/rest/api/2/issue/{key}",
-                         params={"expand": expand} if expand else None,
-                         headers=self.headers, verify=False, timeout=60)
-        r.raise_for_status()
-        return r.json()
-
-    def search(self, jql: str, fields: str, max_results: int = 100,
-               expand: str = "") -> list[dict]:
-        params = {"jql": jql, "fields": fields, "maxResults": max_results}
-        if expand:
-            params["expand"] = expand
-        r = requests.get(f"{self.base}/rest/api/2/search", params=params,
-                         headers=self.headers, verify=False, timeout=60)
-        r.raise_for_status()
-        return r.json().get("issues", [])
+# ── TestRail-client (Jira-client en changelog-parsing: jira_core.py) ─────────
 
 
 class TestRailClient:
@@ -233,46 +179,7 @@ class TestRailClient:
         return out
 
 
-def _dt(value) -> datetime:
-    """Jira ISO string or TestRail unix timestamp → naive local datetime."""
-    if isinstance(value, str):
-        return datetime.fromisoformat(value).replace(tzinfo=None)
-    return datetime.fromtimestamp(value)
-
-
 # ── A. Jira lifecycle ────────────────────────────────────────────────────────
-
-
-def _status_transitions(issue: dict) -> list[dict]:
-    out = []
-    for hist in (issue.get("changelog") or {}).get("histories") or []:
-        for item in hist.get("items") or []:
-            if item.get("field") == "status":
-                out.append({
-                    "ts": hist["created"],
-                    "author": (hist.get("author") or {}).get("displayName", ""),
-                    "from": item.get("fromString"),
-                    "to": item.get("toString"),
-                })
-    out.sort(key=lambda t: t["ts"])
-    return out
-
-
-def _time_in_status(issue: dict, transitions: list[dict]) -> dict[str, float]:
-    """Days spent in each status, from created to resolution (or last update)."""
-    created = _dt(issue["fields"]["created"])
-    end = _dt(issue["fields"].get("resolutiondate")
-              or issue["fields"].get("updated") or issue["fields"]["created"])
-    days: dict[str, float] = defaultdict(float)
-    cursor, status = created, (transitions[0]["from"] if transitions
-                               else issue["fields"]["status"]["name"])
-    for tr in transitions:
-        ts = _dt(tr["ts"])
-        days[status or "?"] += (ts - cursor).total_seconds() / 86400
-        cursor, status = ts, tr["to"]
-    if end > cursor:
-        days[status or "?"] += (end - cursor).total_seconds() / 86400
-    return {k: round(v, 1) for k, v in days.items()}
 
 
 def build_jira_lifecycle(jira: JiraClient, story_key: str) -> dict:
@@ -862,8 +769,6 @@ def build_change_pressure(jira: JiraClient, corpus: dict | None, run_metrics: di
 
 # ── G. Dev vs test effort (calendar proxy) ───────────────────────────────────
 
-_BACKFILL_THRESHOLD_D = 0.04  # ≈1 h: all transitions inside this = admin backfill
-
 
 def _phase_days(tis: dict) -> tuple[float, float]:
     return round(tis.get(STATUS_DEV, 0), 1), round(tis.get(STATUS_TEST, 0), 1)
@@ -886,9 +791,7 @@ def build_dev_test_ratio(jira: JiraClient, lifecycle: dict,
     def add_entry(key, itype, summary, transitions, tis, *,
                   status=None, target=None):
         dev, test = _phase_days(tis)
-        backfilled = bool(transitions) and (
-            (_dt(transitions[-1]["ts"]) - _dt(transitions[0]["ts"]))
-            .total_seconds() / 86400 < _BACKFILL_THRESHOLD_D)
+        backfilled = _is_backfilled(transitions)
         entry = {
             "key": key, "issuetype": itype, "summary": summary[:70],
             "dev_days_in_progress": dev, "test_days_in_testing": test,
@@ -1016,7 +919,6 @@ def build_dev_test_ratio(jira: JiraClient, lifecycle: dict,
 
 # ── V. Value stream map (SAFe-style: active / wait / %C&A per step) ─────────
 
-WORKDAY_HOURS = 8.0
 FTE_FACTOR = 0.8  # 40 u/wk bij 0,8 FTE — de rekeneenheid die de business hanteert
 
 # Aannames over teststappen waar geen meting voor bestaat. Elke waardestroom-
@@ -1067,20 +969,6 @@ _ASSUMPTION_BASIS = {
                     "als systeemtester aangenomen, BAT buiten TestRail."),
 }
 
-
-def _workdays(start: datetime, end: datetime) -> float:
-    """Werkdagen (ma–vr) tussen twee momenten, met fractie van de laatste dag."""
-    if end <= start:
-        return 0.0
-    days, cur = 0.0, start.date()
-    while cur < end.date():
-        if cur.weekday() < 5:
-            days += 1
-        cur += timedelta(days=1)
-    if end.date().weekday() < 5:
-        days += min((end - datetime.combine(end.date(), datetime.min.time()))
-                    .total_seconds() / (WORKDAY_HOURS * 3600), 1.0)
-    return round(days, 1)
 
 
 def build_value_stream(lifecycle: dict, run_metrics: dict, dev_test: dict) -> dict:
@@ -1837,15 +1725,6 @@ def _begrippen_md() -> list[str]:
     return L
 
 
-def _md_table(headers: list, rows) -> list[str]:
-    """Markdown pipe-tabel: kopregel + scheidingsregel (breedte volgt uit de
-    headers) + één regel per rij. Vervangt het handmatige `|---|`-ceremonieel."""
-    out = ["| " + " | ".join(str(h) for h in headers) + " |",
-           "|" + "|".join("---" for _ in headers) + "|"]
-    out += ["| " + " | ".join(str(c) for c in row) + " |" for row in rows]
-    return out
-
-
 def render_report_md(report: dict) -> str:
     lc = report["jira_lifecycle"]
     rm = report["testrail_run"]
@@ -2268,16 +2147,6 @@ def _export_docx(md_path: Path) -> Path | None:
         print(f"  ⚠️ pandoc-export mislukt ({exc}). Handmatig: {manual}",
               file=sys.stderr)
         return None
-
-
-def _write_csv(path: Path, header: list, rows) -> Path:
-    """Eén CSV met UTF-8 + `newline=""` (de invarianten die anders per blok
-    herhaald werden)."""
-    with path.open("w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
-        w.writerow(header)
-        w.writerows(rows)
-    return path
 
 
 def write_outputs(report: dict, out_dir: Path) -> list[Path]:

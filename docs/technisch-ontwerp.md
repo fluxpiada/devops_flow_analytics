@@ -5,6 +5,10 @@ welk veld eruit komt, hoe dat wordt geïnterpreteerd, en welke aannames erin zit
 Bedoeld om elk getal in het rapport en het deck terug te kunnen voeren op een bron —
 of, waar dat niet kan, expliciet te zien dát het een aanname is.
 
+§0 t/m §12 beschrijven de **business case per story** (Jira + TestRail); §13 de
+losstaande **flow-analyse per project** (alleen Jira), die de gedeelde laag
+`jira_core.py` met de eerste keten deelt.
+
 Twee scripts, één keten:
 
 ```mermaid
@@ -411,3 +415,173 @@ De belangrijkste tabel in dit document.
    fail→pass leest als "passed". De de-facto-classificatie gebruikt daarom de laatst
    bekende uitkomst — precies wat de eerstvolgende run zag — maar in-run hertests
    blijven er onzichtbaar (die meet §3 alleen voor de case-study-run).
+
+---
+
+## 13. Flow-analyse per project — `jira_flow_analysis.py`
+
+Een tweede, zelfstandige keten: niet één story maar een **heel Jira-project**, en
+niet de business case maar de **doorlooptijd per statuscategorie** — de vraag
+achter een cumulative flow diagram. Read-only, uitsluitend Jira, geen TestRail.
+
+```mermaid
+flowchart TD
+    A[creds.yaml] --> B[jira_core.py<br/>JiraClient + changelog]
+    B --> C[jira_flow_analysis.py]
+    C --> D[(flow-cache<br/>per project)]
+    D --> C
+    C --> E[report.md]
+    C --> F[issues / statuses / sprints CSV + JSON]
+```
+
+`scripts/jira_core.py` is de gedeelde laag onder béide scripts: `_find_creds`,
+`JiraClient` (Bearer PAT + contextpad-probe), `_status_transitions`,
+`_status_spans`, `_time_in_status*`, `_workdays*`, `_md_table`, `_write_csv`.
+`testauto_businesscase.py` importeert er nu uit in plaats van eigen kopieën te
+houden.
+
+### 13.1 Ophalen
+
+| Stap | Call | Bijzonderheid |
+|---|---|---|
+| Projectsleutel | — | `_project_key()` accepteert `…/browse/MOD`, `…/browse/MOD-123`, `…/projects/MOD` of `MOD` |
+| Statuscategorieën | `GET /rest/api/2/project/<KEY>/statuses` | levert per issuetype de statussen mét `statusCategory` |
+| Sprintveld | `GET /rest/api/2/field` | het customfield met `schema.custom` ~ `gh-sprint` (op MOD: `customfield_10007`) |
+| Issues | `GET /rest/api/2/search` + `expand=changelog` | via `JiraClient.search_all()` — **met `startAt`-paginering** |
+
+`search_all()` bestaat omdat de bestaande `search()` één request doet en alles
+boven `maxResults` stil laat vallen; voor een projectbrede analyse is dat het
+verschil tussen "de eerste 100 issues" en "het project".
+
+JQL: `project = "<KEY>" AND (resolutiondate >= <start> OR (resolutiondate IS
+EMPTY AND updated >= <start>))`, standaard `AND issuetype NOT IN
+subTaskIssueTypes()`. Open issues worden dus meegenomen (als WIP), maar alleen
+als ze recent zijn aangeraakt.
+
+De opgehaalde issues gaan in `output/<PROJECT>/jira_flow_cache_<PROJECT>.json`
+met een fingerprint (`project`, `months`, `jql`) plus `cache_version` — wijkt er
+iets af, of staat `--refresh` aan, dan volgt een verse fetch. Zelfde patroon als
+de corpus-cache in §4.
+
+### 13.2 Statuscategorieën en normalisatie
+
+De changelog levert alleen status**namen** (`fromString`/`toString`), geen
+categorie; die komt uit de workflow (`statusCategory.key`: `new` → To Do,
+`indeterminate` → In Progress, `done` → Done). Dit script kent daarmee géén
+hardgecodeerde statusnamen — de beperking uit §12.2 geldt hier niet.
+
+**Hoofdlettergevoeligheid is een echte valkuil.** De changelog bewaart de naam
+zoals die op dát moment was, en dat verschilt in de praktijk soms alleen in
+casing: op MOD komen `in Review` en `In Review` in hetzelfde issue voor.
+`canonical_statuses()` mapt via een kleine-letterindex terug naar de huidige
+schrijfwijze. Zonder die stap valt één status uiteen in twee rijen, waarvan er
+één als *onbekend* wordt geteld — bij MOD scheelde dat 12 van de 15 metingen op
+`In Review`. Statussen die ook case-insensitief niet in de workflow zitten
+(echt hernoemd of verwijderd) worden als `onbekend` geteld én in rapport §1
+opgesomd, niet stil in een categorie geduwd.
+
+### 13.3 Tijd per status — werkdagen
+
+`_status_spans()` (gedeeld) levert per aaneengesloten verblijf `(status, start,
+eind)`. `_time_in_status_workdays()` telt die op met `_workdays_elapsed()`.
+
+Let op het verschil met de bestaande `_workdays()` uit §7: die telt de **startdag
+altijd als hele dag** — een fase-lengte, geen duur. Voor statusverblijven is dat
+onbruikbaar (een status van tien minuten zou 1 dag scoren), dus meet
+`_workdays_elapsed()` de écht verstreken tijd met de weekenden eruit; een deel
+van een dag telt naar rato van het etmaal. Er is nergens urenregistratie, dus
+een kantoorurenvenster (09–17) zou een precisie suggereren die de data niet
+heeft. `_workdays()` is ongewijzigd gebleven zodat de waardestroom in §7
+identiek blijft rekenen.
+
+**Het observatievenster per issue** (`_observation_end`) eindigt bij de láátste
+statusovergang als het issue in een Done-status staat — "al 200 dagen Closed" is
+archieftijd, geen doorlooptijd. Gevolg: in een workflow met één Done-status is
+de categorie *Done* (bijna) nul. Dat is de juiste lezing, en staat als zodanig in
+rapport §5. Loopt het issue nog, dan telt de tijd door tot nu, maar het valt dan
+buiten de aggregaten (zie 13.5).
+
+### 13.4 Sprints en venstersnapping
+
+Sprintwaarden komen uit het customfield en zijn óf greenhopper-strings
+(`…Sprint@1f39bc[id=…,state=CLOSED,name=…,startDate=…,completeDate=…]`) óf, op
+nieuwere DC-versies, JSON-objecten; `_parse_sprint_value()` kan beide, inclusief
+namen met komma's erin en `completeDate=<null>`. Het sprinteinde is
+`completeDate` als die er is, anders `endDate` — de feitelijke afsluiting gaat
+vóór de planning.
+
+- **Snapping** (`snap_window`): het ruwe venster is `[nu − N maanden, nu]`.
+  Meegenomen worden alleen sprints die **afgerond** zijn én volledig binnen dat
+  venster vallen; het effectieve venster wordt `[eerste sprintstart, laatste
+  sprinteind]`. De reden is rechtse censurering: in een sprint die aan het eind
+  van het venster wordt afgekapt tellen alleen de issues mee die er vóór de knip
+  al klaar waren, terwijl het tragere werk uit diezelfde sprint erna afrondt en
+  buiten beeld valt — die randperiode meet dus systematisch te kort. Beide
+  vensters staan in rapport §1. Uit te zetten met `--no-sprint-snap`; zonder sprintveld
+  of zonder passende sprints valt het script automatisch terug op het
+  kalendervenster, mét waarschuwing.
+- **Toewijzing** (`sprint_periods`): sprints overlappen elkaar in de praktijk
+  (op MOD loopt "Hemelvaart" t/m 25-06 terwijl de volgende op 19-06 start) en
+  laten soms gaten vallen. De perioden worden daarom aaneengesloten gemaakt —
+  sprint *i* loopt tot de start van sprint *i+1* — zodat elke afronddatum bij
+  precies één sprint hoort. De sprinttabel toont die toewijzingsgrenzen, niet de
+  sprintdatums.
+- Een issue telt bij de sprint waarin het is **afgerond**, niet die waarin het
+  gepland stond. **Spillover** is het aantal `Sprint`-veldwijzigingen in de
+  changelog: meer dan één betekent dat het issue tijdens zijn leven van sprint
+  is gewisseld.
+
+### 13.5 Aggregatie
+
+Uitgesloten uit de doorlooptijdcijfers, elk apart geteld in rapport §1:
+
+1. **Backfill** — `_is_backfilled()` (gedeeld met §6): alle statusovergangen
+   binnen ~1 uur. Op MOD 7 van de 34 afgeronde issues.
+2. **Onderhanden werk** — geen `resolutiondate`, dus geen doorlooptijd. Wel
+   geteld en per categorie uitgesplitst, want juist daar hoopt het werk zich op.
+
+Per categorie, per status en per sprint: **n / mediaan / gemiddelde / p85**, in
+werkdagen. De mediaan is de kop omdat doorlooptijden scheef verdeeld zijn — een
+handvol issues blijft maanden liggen, en een kaal gemiddelde beschrijft dan
+niemand. `_p85()` interpoleert lineair (geen numpy).
+
+De statusdrill-down toont per status ook `× eindstatus`: hoe vaak die status de
+laatste was. Een puur terminale status heeft per definitie geen verblijfsduur en
+zou anders helemaal uit de tabel vallen, terwijl juist de vraag "waar eindigt
+het werk?" hem nodig heeft.
+
+**Trend per sprint**: de reeks sprintmedianen per categorie, met een
+kleinste-kwadratenfit over de sprintindex (helling in werkdagen per sprint,
+richting stabiel/stijgend/dalend bij een drempel van 0,05) en een sparkline van
+blokjes. Die schaalt per rij tussen het eigen minimum en maximum: hij toont de
+vórm van het verloop, niet het niveau. Minder dan 3 sprints met data ⇒ geen
+trend.
+
+### 13.6 Gemeten versus afgeleid
+
+| Grootheid | Status | Bron / aanname |
+|---|---|---|
+| Statusovergangen en tijdstempels | **gemeten** | `changelog.histories` |
+| Statuscategorie per status | **gemeten** | `statusCategory` uit de projectworkflow |
+| Sprintnaam, start, eind | **gemeten** | sprint-customfield |
+| Tijd per status in werkdagen | **afgeleid** | `_workdays_elapsed`; weekenden eruit, deeldag naar rato van het etmaal |
+| Einde van het observatievenster | **afgeleid** | laatste overgang bij een Done-status; anders `resolutiondate`, anders nu |
+| Sprint van een issue | **afgeleid** | afronddatum binnen de aaneengesloten sprintperiode |
+| Spillover | **afgeleid** | >1 `Sprint`-wijziging in de changelog |
+| Backfilldrempel (~1 uur) | **aanname** | `BACKFILL_THRESHOLD_D`, gedeeld met §6 |
+| "In Progress" = eraan gewerkt | **aanname** | er zijn geen uren; de status zegt alleen dat het issue die status droeg |
+
+### 13.7 Bekende beperkingen
+
+1. **Tijd in de eindstatus telt niet mee** (13.3) — in een workflow met één
+   Done-status is *Done* daarom bijna nul.
+2. **Hernoemde statussen** vallen buiten de workflow-kaart; casing wordt
+   opgevangen (13.2), een echte hernoeming niet.
+3. **Onderhanden werk ontbreekt in de gemiddelden.** Loopt het werk júist nu
+   vast, dan zie je dat pas als het afrondt; de WIP-verdeling is de tegenhanger.
+4. **Sprinttoewijzing gaat op afronddatum**, niet op sprintlidmaatschap — dat is
+   robuust tegen slechte sprintveld-hygiëne, maar leest anders dan een
+   sprint-burndown.
+5. **Geen CFD-grafiek.** De gestapelde vlakdiagram-vorm zelf is bewust niet
+   gebouwd (geen plot-dependency); de dagelijkse reconstructie die daarvoor
+   nodig is, is met `_status_spans()` wel afleidbaar uit dezelfde data.

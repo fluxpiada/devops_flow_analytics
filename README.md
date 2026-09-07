@@ -124,6 +124,54 @@ Het deck komt volledig uit `deck_content.md`: élke tekst, tabel en tijdlijnstap
 staat als bewerkbare regel in dat checkpoint. Bewerk het en render met
 `--content`; niets zit meer hardcoded in de renderer.
 
+## Flow-analyse per project
+
+Naast de business case per story zit er een **projectbrede flow-analyse** in de
+repo: hoe lang blijft werk in een Jira-project hangen in *To Do*, *In Progress*
+en *Done*, welke losse statussen kosten die tijd, en verbetert dat per sprint?
+Een cumulative-flow-diagram-vraag, beantwoord uit de changelog — read-only en
+zonder urenregistratie.
+
+```bash
+# venster is standaard 6 maanden; interactief biedt hij 12 aan
+uv run python scripts/jira_flow_analysis.py \
+    --jira-url https://jira.vitens.lan/jira/browse/MOD
+
+# niet-interactief, expliciet venster, verse fetch
+uv run python scripts/jira_flow_analysis.py --project MOD --months 12 --refresh
+```
+
+Het venster wordt **naar sprintgrenzen gesnapt**: alleen afgeronde sprints die
+volledig binnen de gevraagde periode vallen tellen mee. Bij een sprint die aan
+het eind van het venster wordt afgekapt tellen namelijk alleen de issues mee die
+er vóór de knip al klaar waren; het tragere werk dat erna afrondde valt buiten
+beeld en trekt de gemeten doorlooptijd van die randperiode omlaag. Vandaar dat
+het venster krimpt naar de echte sprintgrenzen. Het rapport toont zowel het
+gevraagde als het gebruikte venster.
+
+Alles is in **werkdagen** (ma–vr) en de kop is de **mediaan**, niet het
+gemiddelde: doorlooptijden zijn scheef verdeeld, dus staan mediaan, gemiddelde
+én p85 naast elkaar.
+
+| Wat je wilt | Optie |
+|---|---|
+| Ander venster | `--months 12` |
+| Alleen bepaalde issuetypes | `--issue-types "Story,Bug"` |
+| Subtaken meenemen | `--include-subtasks` |
+| Kalendervenster i.p.v. sprintgrenzen | `--no-sprint-snap` |
+| Cache negeren en live ophalen | `--refresh` |
+| Ander cachebestand | `--flow-cache PATH` |
+
+Artefacten landen in **`output/<PROJECT>/`**: `…_report.md` (het hoofddocument),
+`…json`, en CSV's `_issues` (per issue de dagen per categorie), `_statuses` en
+`_sprints`. De opgehaalde issues worden gecachet in
+`output/<PROJECT>/jira_flow_cache_<PROJECT>.json`, zodat een tweede analyse geen
+volledige changelog-fetch meer kost.
+
+**Statuscategorieën komen uit Jira zelf** (`statusCategory` uit de workflow van
+het project), niet uit een hardgecodeerde lijst statusnamen — dit script deelt
+dus niet de `--status-dev/--status-test`-beperking van de business case.
+
 ## Credentials
 
 Zet een `creds.yaml` in de repo (gitignored) of laat het script terugvallen op
