@@ -149,9 +149,28 @@ beeld en trekt de gemeten doorlooptijd van die randperiode omlaag. Vandaar dat
 het venster krimpt naar de echte sprintgrenzen. Het rapport toont zowel het
 gevraagde als het gebruikte venster.
 
-Alles is in **werkdagen** (ma–vr) en de kop is de **mediaan**, niet het
-gemiddelde: doorlooptijden zijn scheef verdeeld, dus staan mediaan, gemiddelde
-én p85 naast elkaar.
+Alles is in **werkdagen** — weekenden én Nederlandse landelijke feestdagen
+tellen niet mee (op MOD scheelt dat ruim 2 dagen per issue). De kop is de
+**mediaan**: de helft van de issues zit eronder, de helft erboven. Naast dat ene
+getal staat een **verdeling**, want een mediaan verbergt of er één soort werk is
+of twee.
+
+Drie dingen die het rapport expliciet apart houdt:
+
+- **Doorvoer in plaats van "tijd in Done".** Zodra een issue zijn eindstatus
+  bereikt stopt de meting, dus een verblijfsduur in Done bestaat niet. Wat de
+  Done-band in een cumulative flow diagram wél zegt is hoevéél werk eruit komt —
+  dat staat er als doorvoer per sprint.
+- **Bulk aangemaakte issues.** Bij een backlog-import krijgen tientallen issues
+  dezelfde `created`, en dan meet hun To Do-tijd hoe lang geleden de backlog is
+  ingeladen in plaats van hoe lang iemand op het werk wachtte. Het rapport
+  benoemt de importmomenten en splitst de doorlooptijd in twee cohorten. Op MOD
+  is dat 86 werkdagen voor de geïmporteerde issues tegen 43 voor los aangemaakte
+  — precies het dubbele, dus het onderscheid is geen detail.
+- **Actief aandeel**: de tijd in een In Progress-status gedeeld door de
+  doorlooptijd. Let op dat dit géén flow-efficiëntie is in de zin van de
+  waardestroom (§7 van het technisch ontwerp) — een issue dat een weekend in
+  "Test" staat telt hier als actief.
 
 | Wat je wilt | Optie |
 |---|---|

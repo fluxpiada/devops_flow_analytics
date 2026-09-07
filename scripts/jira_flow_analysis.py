@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import statistics
 import sys
@@ -62,6 +63,9 @@ UNKNOWN_CATEGORY = "onbekend"
 
 _PROJECT_KEY_RE = re.compile(r"([A-Z][A-Z0-9_]+)")
 _SPARK = "▁▂▃▄▅▆▇█"
+
+# Zoveel issues met dezelfde aanmaakminuut = een import, geen toeval.
+BULK_CREATE_MIN = 5
 
 
 # ── invoer ───────────────────────────────────────────────────────────────────
@@ -152,6 +156,37 @@ def _trend(series: list[float | None]) -> dict | None:
         "stijgend" if slope > 0 else "dalend")
     return {"slope_days_per_sprint": round(slope, 2), "direction": direction,
             "n_sprints": n}
+
+
+def _nice_bin(span: float, target: int) -> float:
+    """Bakbreedte die op een 'rond' getal uitkomt (1, 2, 2.5, 5, 10 × 10ⁿ)."""
+    raw = span / target
+    if raw <= 0:
+        return 1.0
+    mag = 10 ** math.floor(math.log10(raw))
+    for mult in (1, 2, 2.5, 5):
+        if raw <= mag * mult:
+            return mag * mult
+    return mag * 10
+
+
+def _histogram(values: list[float], target_bins: int = 8) -> list[tuple]:
+    """(ondergrens, bovengrens, aantal) per bak.
+
+    Eén kengetal verbergt of de verdeling één piek heeft of twee; die vraag —
+    "wat is nou het typische geval?" — beantwoordt alleen de verdeling zelf.
+    """
+    if not values:
+        return []
+    lo, hi = min(values), max(values)
+    width = _nice_bin(hi - lo, target_bins) if hi > lo else 1.0
+    start = math.floor(lo / width) * width
+    n_bins = int(math.floor((hi - start) / width)) + 1
+    counts = [0] * n_bins
+    for v in values:
+        counts[min(int((v - start) // width), n_bins - 1)] += 1
+    return [(start + i * width, start + (i + 1) * width, counts[i])
+            for i in range(n_bins)]
 
 
 def _sparkline(series: list[float | None]) -> str:
@@ -480,6 +515,30 @@ def _issue_record(issue: dict, canon: dict[str, str], category_of,
     }
 
 
+def detect_bulk_creation(records: list[dict]) -> dict:
+    """Aanmaakmomenten waarop een hele partij issues tegelijk is ontstaan.
+
+    Bij een backlog-import krijgen tientallen issues dezelfde `created` — hun
+    klok begint dan bij de import en niet bij het moment waarop iemand het werk
+    vroeg. Dat blaast de To Do-tijd (en dus de doorlooptijd) op van precies die
+    issues, en niet van de rest. Ze apart houden is het verschil tussen "het
+    duurt 72 dagen" en "het duurt 72 dagen sinds we de backlog inlaadden".
+    """
+    per_minute = Counter(r["created"][:16] for r in records)
+    moments = sorted(((ts, n) for ts, n in per_minute.items()
+                      if n >= BULK_CREATE_MIN), key=lambda x: (-x[1], x[0]))
+    bulk_ts = {ts for ts, _ in moments}
+    for r in records:
+        r["bulk_created"] = r["created"][:16] in bulk_ts
+    n_bulk = sum(1 for r in records if r["bulk_created"])
+    return {
+        "moments": [{"timestamp": ts, "issues": n} for ts, n in moments],
+        "n_bulk_created": n_bulk,
+        "n_total": len(records),
+        "pct": round(n_bulk / len(records) * 100, 1) if records else None,
+    }
+
+
 def _sprint_of(record: dict, periods: list[dict]) -> dict | None:
     ts = record["resolved_dt"]
     if ts is None:
@@ -500,6 +559,7 @@ def build_flow(issues: list[dict], status_map: dict[str, str],
                               UNKNOWN_CATEGORY)
 
     records = [_issue_record(i, canon, category_of, now) for i in issues]
+    bulk = detect_bulk_creation(records)
 
     start, end = _dt(window["start"]), _dt(window["end"])
     in_window = [r for r in records
@@ -573,9 +633,17 @@ def build_flow(issues: list[dict], status_map: dict[str, str],
     trends = {c: _trend([s["per_category"][c]["median"] for s in sprint_rows])
               for c in CATEGORIES}
     trends["lead_time"] = _trend([s["lead_time"]["median"] for s in sprint_rows])
+    trends["throughput"] = _trend([float(s["n_completed"]) for s in sprint_rows])
 
     unknown = sorted({s for r in analysed for s in r["per_status"]
                       if s not in status_map})
+
+    lead_values = [r["lead_time_days"] for r in analysed]
+    # Actief aandeel per issue, dan de mediaan — niet mediaan/mediaan, want dat
+    # deelt twee verschillende issues door elkaar.
+    active_share = [r["per_category"]["In Progress"] / r["lead_time_days"] * 100
+                    for r in analysed if r["lead_time_days"] > 0]
+    throughput = [float(s["n_completed"]) for s in sprint_rows]
 
     return {
         "generated": now.isoformat(timespec="seconds"),
@@ -588,7 +656,18 @@ def build_flow(issues: list[dict], status_map: dict[str, str],
             "in_flight_wip": len(in_flight),
             "resolved_outside_sprints": outside,
         },
-        "lead_time": _stats([r["lead_time_days"] for r in analysed]),
+        "lead_time": _stats(lead_values),
+        "lead_time_histogram": [{"from": round(a, 1), "to": round(b, 1),
+                                 "n": n} for a, b, n in _histogram(lead_values)],
+        "lead_time_by_cohort": {
+            "bulk_created": _stats([r["lead_time_days"] for r in analysed
+                                    if r["bulk_created"]]),
+            "individually_created": _stats([r["lead_time_days"] for r in analysed
+                                            if not r["bulk_created"]]),
+        },
+        "bulk_creation": bulk,
+        "throughput": {**_stats(throughput), "total": int(sum(throughput))},
+        "active_share_pct": _stats(active_share),
         "categories": categories,
         "statuses": dict(sorted(statuses.items(),
                                 key=lambda kv: (-(kv[1]["total"] or 0),))),
@@ -627,23 +706,38 @@ def render_flow_md(report: dict, project: str) -> str:
     # §0 ─────────────────────────────────────────────────────────────────────
     L.append("## 0. De kern\n")
     lt = report["lead_time"]
+    tp = report["throughput"]
+    act = report["active_share_pct"]
     L.append(f"Een issue in **{project}** doet er typisch **{_n(lt['median'])} "
-             f"werkdagen** over van aanmaak tot eindstatus (mediaan; "
-             f"gemiddeld {_n(lt['mean'])}, p85 {_n(lt['p85'])}). Die tijd valt "
-             f"uiteen in:\n")
-    for cat in CATEGORIES:
+             f"werkdagen** over van aanmaak tot eindstatus (mediaan; p85 "
+             f"{_n(lt['p85'])}). Het team rondt daarbij **{_n(tp['median'])} "
+             f"issues per sprint** af ({tp['total']} in het hele venster). Die "
+             f"doorlooptijd valt uiteen in:\n")
+    for cat in ("To Do", "In Progress"):
         st = cats.get(cat) or {}
         L.append(f"- **{cat}** — mediaan {_n(st.get('median'))} werkdagen "
                  f"(gemiddeld {_n(st.get('mean'))}, p85 {_n(st.get('p85'))})")
     L.append("")
-    tds = (cats.get("To Do") or {}).get("median")
-    ips = (cats.get("In Progress") or {}).get("median")
-    if tds is not None and ips is not None and (tds + ips) > 0:
-        L.append(f"Van de gemeten doorlooptijd is **{round(tds / (tds + ips) * 100)}%** "
-                 f"wachttijd (To Do) tegenover {round(ips / (tds + ips) * 100)}% "
-                 f"tijd waarin er daadwerkelijk aan gewerkt kón worden "
-                 f"(In Progress). Dat verschil is de flow-winst die zonder "
-                 f"extra capaciteit te halen is.\n")
+    if act["median"] is not None:
+        L.append(f"Het **actieve aandeel** — de tijd in een In Progress-status "
+                 f"gedeeld door de doorlooptijd — is **{_n(act['median'], '%')}** "
+                 f"(mediaan per issue). De rest staat stil in de backlog. Let op "
+                 f"de naam: dit is niet de flow-efficiëntie uit de waardestroom, "
+                 f"want een issue dat een weekend lang in 'Test' staat telt hier "
+                 f"als actief.\n")
+    bulk = report["bulk_creation"]
+    if bulk["moments"]:
+        coh = report["lead_time_by_cohort"]
+        L.append(f"⚠️ **{bulk['n_bulk_created']} van de {bulk['n_total']} "
+                 f"opgehaalde issues ({_n(bulk['pct'], '%')}) zijn in bulk "
+                 f"aangemaakt** — zie §1. Hun klok begint bij die import, niet "
+                 f"bij het moment waarop het werk gevraagd werd, en dat blaast "
+                 f"hun To Do-tijd op. Gesplitst: mediaan "
+                 f"**{_n(coh['bulk_created']['median'])}** werkdagen voor de "
+                 f"bulk-issues (n={coh['bulk_created']['n']}) tegenover "
+                 f"**{_n(coh['individually_created']['median'])}** voor los "
+                 f"aangemaakte issues (n={coh['individually_created']['n']}). "
+                 f"De tweede is de eerlijkere maat voor het proces.\n")
     tr = report["trends"].get("lead_time")
     if tr:
         L.append(f"Over {tr['n_sprints']} sprints is de doorlooptijd "
@@ -658,9 +752,12 @@ def render_flow_md(report: dict, project: str) -> str:
              "**To Do / In Progress / Done** toegewezen via Jira's eigen "
              "`statusCategory` uit de workflow van dit project — niet via een "
              "vaste lijst statusnamen.\n")
-    L.append("Alles is in **werkdagen** (ma–vr): een issue dat vrijdagmiddag "
-             "blijft liggen en maandagochtend verdergaat heeft niet drie dagen "
-             "gewacht.\n")
+    L.append("Alles is in **werkdagen**: een issue dat vrijdagmiddag blijft "
+             "liggen en maandagochtend verdergaat heeft niet drie dagen "
+             "gewacht. Weekenden tellen niet mee, en **Nederlandse landelijke "
+             "feestdagen** ook niet — Tweede Paasdag, Koningsdag, Hemelvaart, "
+             "Tweede Pinksterdag, Kerst en Nieuwjaar. Goede Vrijdag telt wél "
+             "als werkdag, en Bevrijdingsdag alleen in lustrumjaren.\n")
     L.extend(_md_table(
         ["Venster", "Waarde"],
         [["Aangevraagd (ruw)", f"{w['raw_start'][:10]} t/m {w['raw_end'][:10]} "
@@ -693,18 +790,73 @@ def render_flow_md(report: dict, project: str) -> str:
                  f"workflow van {project} voorkomen (hernoemd of verwijderd) en "
                  f"daarom als *{UNKNOWN_CATEGORY}* zijn geteld: "
                  f"{', '.join(report['unknown_statuses'])}.\n")
+    if bulk["moments"]:
+        L.append("**Bulk aangemaakte issues.** Deze momenten leverden elk "
+                 f"{BULK_CREATE_MIN} of meer issues met dezelfde aanmaakminuut "
+                 "op — het patroon van een backlog-import:\n")
+        L.extend(_md_table(["Aanmaakmoment", "Issues"],
+                           [[m["timestamp"].replace("T", " "), m["issues"]]
+                            for m in bulk["moments"]]))
+        L.append("")
+        L.append("Voor deze issues meet de To Do-tijd hoe lang geleden de "
+                 "backlog is ingeladen, niet hoe lang iemand op het werk heeft "
+                 "gewacht. Ze staan in de cijfers hieronder, maar §2 splitst de "
+                 "doorlooptijd apart uit zodat het effect zichtbaar is.\n")
 
     # §2 ─────────────────────────────────────────────────────────────────────
-    L.append("## 2. Per statuscategorie\n")
-    L.append("_Werkdagen per issue. De mediaan is het typische geval, p85 de "
-             "staart waar de planning op stukloopt._\n")
+    L.append("## 2. Doorlooptijd en categorieën\n")
+    L.append("_Werkdagen per issue. De mediaan is het typische geval — de helft "
+             "van de issues zit eronder, de helft erboven — en p85 de staart "
+             "waar de planning op stukloopt._\n")
     L.extend(_md_table(["Categorie", "n", "mediaan", "gemiddeld", "p85"],
-                       _stat_rows(cats, (*CATEGORIES, UNKNOWN_CATEGORY))))
+                       _stat_rows(cats, ("To Do", "In Progress",
+                                         UNKNOWN_CATEGORY))))
     L.append("")
-    L.extend(_md_table(["Doorlooptijd totaal", "n", "mediaan", "gemiddeld", "p85"],
+    L.extend(_md_table(["Doorlooptijd totaal", "n", "mediaan", "p85"],
                        [["aanmaak → eindstatus", lt["n"], _n(lt["median"]),
-                         _n(lt["mean"]), _n(lt["p85"])]]))
+                         _n(lt["p85"])]]))
     L.append("")
+    L.append("De categorie *Done* staat hier niet: zodra een issue zijn "
+             "eindstatus bereikt stopt de meting, dus een verblijfsduur in Done "
+             "bestaat niet. Wat de Done-band in een cumulative flow diagram wél "
+             "zegt, is hoeveel werk eruit komt — de doorvoer:\n")
+    L.extend(_md_table(
+        ["Afgerond werk", "Waarde"],
+        [["Doorvoer per sprint (mediaan)", _n(tp["median"])],
+         ["Doorvoer totaal in het venster", tp["total"]],
+         ["Actief aandeel van de doorlooptijd (mediaan per issue)",
+          _n(act["median"], "%")]]))
+    L.append("")
+
+    if bulk["moments"]:
+        coh = report["lead_time_by_cohort"]
+        L.append("### Doorlooptijd per cohort\n")
+        L.extend(_md_table(
+            ["Cohort", "n", "mediaan", "gemiddeld", "p85"],
+            [[label, s["n"], _n(s["median"]), _n(s["mean"]), _n(s["p85"])]
+             for label, s in (("In bulk aangemaakt (import)",
+                               coh["bulk_created"]),
+                              ("Los aangemaakt", coh["individually_created"]))]))
+        L.append("")
+        L.append("_Het tweede cohort is de eerlijkere maat voor het proces; het "
+                 "eerste meet mede hoe lang de backlog al bestond._\n")
+
+    hist = report["lead_time_histogram"]
+    if hist:
+        L.append("### Verdeling van de doorlooptijd\n")
+        top = max((b["n"] for b in hist), default=1) or 1
+        med = lt["median"]
+        for b in hist:
+            marker = ("  ← mediaan" if med is not None
+                      and b["from"] <= med < b["to"] else "")
+            bar = "█" * max(1, round(b["n"] / top * 24)) if b["n"] else ""
+            L.append(f"    {b['from']:>5.0f}–{b['to']:<5.0f}d  {bar:<24} "
+                     f"{b['n']:>3}{marker}")
+        L.append("")
+        L.append("_Eén kengetal verbergt of dit één piek is of twee. Twee "
+                 "duidelijke groepen betekent twee soorten werk — dan is 'de' "
+                 "typische doorlooptijd een gemiddelde van twee processen die "
+                 "los van elkaar bekeken willen worden._\n")
 
     # §3 ─────────────────────────────────────────────────────────────────────
     L.append("## 3. Drill-down — welke statussen kosten de tijd\n")
@@ -728,45 +880,63 @@ def render_flow_md(report: dict, project: str) -> str:
     if not sprints:
         L.append("_Geen afgeronde sprints in het venster gevonden._\n")
     else:
-        L.append("_Een issue telt bij de sprint waarin het is afgerond. "
+        L.append("_Een issue telt bij de sprint waarin het is afgerond; "
+                 "**doorvoer** is dus het aantal issues in die kolom. "
                  "'Spillover' = issues die tijdens hun leven van sprint zijn "
                  "gewisseld._\n")
         L.extend(_md_table(
-            ["Sprint", "start", "eind", "n", "doorloop (med.)", "To Do",
-             "In Progress", "Done", "spillover"],
+            ["Sprint", "start", "eind", "doorvoer", "doorloop (med.)", "To Do",
+             "In Progress", "spillover"],
             [[s["name"], s["start"], s["end"], s["n_completed"],
               _n(s["lead_time"]["median"]),
               _n(s["per_category"]["To Do"]["median"]),
               _n(s["per_category"]["In Progress"]["median"]),
-              _n(s["per_category"]["Done"]["median"]),
               f"{s['n_spilled']} ({_n(s['spilled_pct'], '%')})"]
              for s in sprints]))
         L.append("")
         L.append("### Trend over de sprints\n")
         rows = []
-        for label, key in (("Doorlooptijd", "lead_time"), *((c, c) for c in CATEGORIES)):
-            series = [(s["lead_time"] if key == "lead_time"
-                       else s["per_category"][key])["median"] for s in sprints]
+        series_defs = (("Doorlooptijd", "lead_time", "werkdagen"),
+                       ("To Do", "To Do", "werkdagen"),
+                       ("In Progress", "In Progress", "werkdagen"),
+                       ("Doorvoer", "throughput", "issues"))
+        for label, key, unit in series_defs:
+            if key == "throughput":
+                series = [float(s["n_completed"]) for s in sprints]
+            elif key == "lead_time":
+                series = [s["lead_time"]["median"] for s in sprints]
+            else:
+                series = [s["per_category"][key]["median"] for s in sprints]
             t = report["trends"].get(key)
             rows.append([label, _sparkline(series),
                          t["direction"] if t else "—",
-                         f"{t['slope_days_per_sprint']:+}" if t else "—"])
+                         f"{t['slope_days_per_sprint']:+} {unit}" if t else "—"])
         L.extend(_md_table(
             ["Reeks", f"verloop ({len(sprints)} sprints)", "richting",
-             "werkdagen/sprint"], rows))
+             "per sprint"], rows))
         L.append("")
         L.append("_De sparkline schaalt per rij tussen het eigen minimum en "
                  "maximum; hij toont de vórm van het verloop, niet het niveau. "
                  "De helling komt uit een kleinste-kwadratenfit over de "
-                 "sprintindex._\n")
+                 "sprintindex. Een dalende doorlooptijd bij stijgende doorvoer "
+                 "is de gewenste richting; stijgen ze samen, dan groeit het "
+                 "onderhanden werk._\n")
 
     # §5 ─────────────────────────────────────────────────────────────────────
     L.append("## 5. Beperkingen\n")
     L.append("- **Tijd in de eindstatus telt niet mee.** Zodra een issue in "
              "zijn laatste status staat, stopt de meting: 'al 200 dagen "
-             "Closed' is archieftijd, geen doorlooptijd. In een workflow met "
-             "maar één Done-status is de categorie *Done* daarom (bijna) nul — "
-             "dat is de juiste lezing, geen meetfout.")
+             "Closed' is archieftijd, geen doorlooptijd. Daarom staat *Done* "
+             "niet als verblijfsduur in §2, maar als doorvoer.")
+    L.append("- **Bulk aangemaakte issues vertekenen de doorlooptijd.** Bij een "
+             "backlog-import begint de klok bij de import; §2 splitst daarom "
+             "per cohort. Detectie gaat op gelijke aanmaakminuut, dus een "
+             "import die over meerdere minuten uitgesmeerd is wordt maar "
+             "gedeeltelijk herkend.")
+    L.append("- **Feestdagen zijn de landelijke Nederlandse.** Regionale of "
+             "cao-specifieke vrije dagen, collectieve sluitingen en verlof "
+             "zitten er niet in; Goede Vrijdag telt als werkdag en "
+             "Bevrijdingsdag alleen in lustrumjaren.")
     L.append("- **Backfill.** Issues waarvan álle statusovergangen binnen een "
              "uur vielen zijn achteraf geadministreerd; hun tijdstempels "
              "beschrijven de administratie, niet het werk. Ze zijn geteld maar "
@@ -810,11 +980,11 @@ def write_flow_outputs(report: dict, project: str, out_dir: Path) -> list[Path]:
         out_dir / f"{stem}_issues.csv",
         ["key", "issuetype", "status", "created", "resolved", "sprint",
          "lead_time_days", *(f"days_{c}" for c in (*CATEGORIES, UNKNOWN_CATEGORY)),
-         "in_flight", "backfilled", "sprint_changes"],
+         "in_flight", "backfilled", "bulk_created", "sprint_changes"],
         ([r["key"], r["issuetype"], r["status"], r["created"], r["resolved"] or "",
           r.get("sprint") or "", r["lead_time_days"],
           *(r["per_category"][c] for c in (*CATEGORIES, UNKNOWN_CATEGORY)),
-          r["in_flight"], r["backfilled"], r["sprint_changes"]]
+          r["in_flight"], r["backfilled"], r["bulk_created"], r["sprint_changes"]]
          for r in records)))
 
     paths.append(_write_csv(
@@ -827,7 +997,7 @@ def write_flow_outputs(report: dict, project: str, out_dir: Path) -> list[Path]:
 
     paths.append(_write_csv(
         out_dir / f"{stem}_sprints.csv",
-        ["sprint", "start", "end", "n_completed", "lead_time_median",
+        ["sprint", "start", "end", "throughput", "lead_time_median",
          *(f"median_{c}" for c in CATEGORIES), "n_spilled", "spilled_pct"],
         ([s["name"], s["start"], s["end"], s["n_completed"],
           s["lead_time"]["median"],
@@ -948,9 +1118,13 @@ def main() -> None:
     lt = report["lead_time"]
     cats = report["categories"]
     print(f"\n   {report['counts']['analysed']} issues · doorlooptijd mediaan "
-          f"{_n(lt['median'])} werkdagen · "
+          f"{_n(lt['median'])} werkdagen · doorvoer "
+          f"{_n(report['throughput']['median'])}/sprint · "
           + " · ".join(f"{c} {_n((cats.get(c) or {}).get('median'))}"
-                       for c in CATEGORIES))
+                       for c in ("To Do", "In Progress")))
+    if report["bulk_creation"]["moments"]:
+        _warn(f"{report['bulk_creation']['n_bulk_created']} issues in bulk "
+              f"aangemaakt — zie de cohortsplitsing in §2 van het rapport")
 
 
 if __name__ == "__main__":

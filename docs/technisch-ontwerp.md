@@ -494,6 +494,21 @@ een kantoorurenvenster (09–17) zou een precisie suggereren die de data niet
 heeft. `_workdays()` is ongewijzigd gebleven zodat de waardestroom in §7
 identiek blijft rekenen.
 
+**Feestdagen.** `_workdays_elapsed()` slaat ook de Nederlandse landelijke vrije
+dagen over, via `dutch_holidays(jaar)`. Eerste Paasdag komt uit het anonieme
+Gregoriaanse algoritme (`_easter`) en daaruit volgen Tweede Paasdag (+1),
+Hemelvaart (+39) en Tweede Pinksterdag (+50); Koningsdag schuift naar 26 april
+als 27 april op zondag valt. Berekend in plaats van opgezocht, zodat er geen
+tabel is die stilletjes verloopt. Twee keuzes die per werkgever verschillen
+zitten expliciet in die ene functie: **Goede Vrijdag telt als werkdag** (onder
+de meeste CAO's geen vrije dag) en **Bevrijdingsdag alleen in lustrumjaren**.
+
+Op MOD scheelt dit gemiddeld 2,2 werkdagen per issue (maximaal 4) en zakt de
+mediane doorlooptijd van 64,0 naar 60,0 — de vier feestdagen die in het venster
+vallen zijn Tweede Paasdag, Koningsdag, Hemelvaart en Tweede Pinksterdag. Ook
+hier geldt: `_workdays()` kent ze niet, zodat de business case vergelijkbaar
+blijft met eerder vastgelegde cases.
+
 **Het observatievenster per issue** (`_observation_end`) eindigt bij de láátste
 statusovergang als het issue in een Done-status staat — "al 200 dagen Closed" is
 archieftijd, geen doorlooptijd. Gevolg: in een workflow met één Done-status is
@@ -540,10 +555,41 @@ Uitgesloten uit de doorlooptijdcijfers, elk apart geteld in rapport §1:
 2. **Onderhanden werk** — geen `resolutiondate`, dus geen doorlooptijd. Wel
    geteld en per categorie uitgesplitst, want juist daar hoopt het werk zich op.
 
+Daarnaast wordt de **doorlooptijd in twee cohorten gesplitst**, op basis van
+`detect_bulk_creation()`: aanmaakminuten met `BULK_CREATE_MIN` (5) of meer issues
+zijn een backlog-import. Voor die issues begint de klok bij de import in plaats
+van bij het moment waarop het werk gevraagd werd, en dat blaast alléén hun To
+Do-tijd op. Op MOD zijn dat er 61 van de 108 (56%), verdeeld over twee minuten
+op 2026-01-22; hun mediane doorlooptijd is 86,0 werkdagen tegen 43,3 voor los
+aangemaakte issues. Zonder die splitsing meet de kop van het rapport voor meer
+dan de helft hoe oud de backlog is.
+
 Per categorie, per status en per sprint: **n / mediaan / gemiddelde / p85**, in
 werkdagen. De mediaan is de kop omdat doorlooptijden scheef verdeeld zijn — een
 handvol issues blijft maanden liggen, en een kaal gemiddelde beschrijft dan
-niemand. `_p85()` interpoleert lineair (geen numpy).
+niemand. `_p85()` interpoleert lineair (geen numpy). De doorlooptijdregel toont
+bewust géén gemiddelde: mediaan en p85 zeggen samen wat er te zeggen valt.
+
+Omdat één kengetal niet laat zien of de verdeling één piek heeft of twee, staat
+er een **histogram** naast (`_histogram()`, bakbreedte via `_nice_bin()` op een
+rond getal, ±8 bakken, met de mediaanbak gemarkeerd).
+
+**Done is geen verblijfsduur maar doorvoer.** Zodra een issue zijn eindstatus
+bereikt stopt de meting (13.3), dus "tijd in Done" is structureel nul. In een
+cumulative flow diagram is de Done-band dan ook geen breedte maar een hoogte:
+cumulatieve afronding, met de doorvoer als helling. Daarom staat *Done* niet als
+categorie-rij in rapport §2 maar als **doorvoer per sprint** (mediaan + totaal);
+in de JSON blijft `categories["Done"]` gewoon staan. In §4 is de doorvoer de
+kolom `n_completed`, en er is een doorvoertrend naast de duurtrends.
+
+Het **actief aandeel** (`active_share_pct`) is de tijd in een In Progress-status
+gedeeld door de doorlooptijd, per issue berekend en dan gemedianeerd — niet
+mediaan gedeeld door mediaan, want dat deelt twee verschillende issues door
+elkaar. Nadrukkelijk **niet** hetzelfde als de flow-efficiëntie uit §7: die
+scheidt actief van wachten bínnen een stap, terwijl een categorie-indeling dat
+niet kan (een issue dat een weekend in "Test" staat telt hier als actief). Op
+MOD komt het op 39,6% uit; dat naast de 5–15%-referentie uit §11 leggen zou
+appels met peren zijn.
 
 De statusdrill-down toont per status ook `× eindstatus`: hoe vaak die status de
 laatste was. Een puur terminale status heeft per definitie geen verblijfsduur en
@@ -564,7 +610,11 @@ trend.
 | Statusovergangen en tijdstempels | **gemeten** | `changelog.histories` |
 | Statuscategorie per status | **gemeten** | `statusCategory` uit de projectworkflow |
 | Sprintnaam, start, eind | **gemeten** | sprint-customfield |
-| Tijd per status in werkdagen | **afgeleid** | `_workdays_elapsed`; weekenden eruit, deeldag naar rato van het etmaal |
+| Tijd per status in werkdagen | **afgeleid** | `_workdays_elapsed`; weekenden en NL-feestdagen eruit, deeldag naar rato van het etmaal |
+| Doorvoer per sprint | **gemeten** | aantal issues afgerond in de sprintperiode |
+| Bulk-aangemaakt (import) | **afgeleid** | ≥5 issues met dezelfde aanmaakminuut (`BULK_CREATE_MIN`) |
+| Actief aandeel | **afgeleid** | In Progress-tijd ÷ doorlooptijd per issue; niet gelijk aan flow-efficiëntie §7 |
+| Feestdagenlijst | **aanname** | landelijk NL; Goede Vrijdag werkdag, Bevrijdingsdag alleen in lustrumjaren |
 | Einde van het observatievenster | **afgeleid** | laatste overgang bij een Done-status; anders `resolutiondate`, anders nu |
 | Sprint van een issue | **afgeleid** | afronddatum binnen de aaneengesloten sprintperiode |
 | Spillover | **afgeleid** | >1 `Sprint`-wijziging in de changelog |
@@ -573,15 +623,22 @@ trend.
 
 ### 13.7 Bekende beperkingen
 
-1. **Tijd in de eindstatus telt niet mee** (13.3) — in een workflow met één
-   Done-status is *Done* daarom bijna nul.
-2. **Hernoemde statussen** vallen buiten de workflow-kaart; casing wordt
+1. **Tijd in de eindstatus telt niet mee** (13.3) — daarom rapporteert §2 voor
+   Done doorvoer in plaats van een verblijfsduur.
+2. **Bulk-detectie gaat op de aanmaakminuut.** Een import die over meerdere
+   minuten uitgesmeerd is wordt maar gedeeltelijk herkend; op MOD viel hij
+   toevallig in twee minuten uiteen en zijn beide gevonden. Een import die
+   issues met uiteenlopende `created` aanmaakt (bijvoorbeeld met behoud van de
+   oorspronkelijke datum) blijft onzichtbaar.
+3. **Feestdagen zijn de landelijke Nederlandse.** Regionale of cao-specifieke
+   vrije dagen, collectieve sluitingen, verlof en ziekte zitten er niet in.
+4. **Hernoemde statussen** vallen buiten de workflow-kaart; casing wordt
    opgevangen (13.2), een echte hernoeming niet.
-3. **Onderhanden werk ontbreekt in de gemiddelden.** Loopt het werk júist nu
+5. **Onderhanden werk ontbreekt in de gemiddelden.** Loopt het werk júist nu
    vast, dan zie je dat pas als het afrondt; de WIP-verdeling is de tegenhanger.
-4. **Sprinttoewijzing gaat op afronddatum**, niet op sprintlidmaatschap — dat is
+6. **Sprinttoewijzing gaat op afronddatum**, niet op sprintlidmaatschap — dat is
    robuust tegen slechte sprintveld-hygiëne, maar leest anders dan een
    sprint-burndown.
-5. **Geen CFD-grafiek.** De gestapelde vlakdiagram-vorm zelf is bewust niet
+7. **Geen CFD-grafiek.** De gestapelde vlakdiagram-vorm zelf is bewust niet
    gebouwd (geen plot-dependency); de dagelijkse reconstructie die daarvoor
    nodig is, is met `_status_spans()` wel afleidbaar uit dezelfde data.
