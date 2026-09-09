@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -)",
+      "Bash(uvx ruff *)",
+      "Bash(cat /tmp/flowcheck/MOD/jira_flow_20260904_143116_report.md)",
+      "Read(//private/tmp/flowcheck/MOD/**)",
+      "Bash(sed -n '/## 1\\\\./,/## 2\\\\./p;/## 3\\\\./,/## 5\\\\./p' /tmp/flowcheck/MOD/jira_flow_20260904_150753_report.md)",
+      "Bash(cd /Users/flofonic/github_repos/devops_flow_analytics *)",
+      "Read(//tmp/flowcheck/**)",
+      "Bash(SP=/private/tmp/claude-501/-Users-flofonic-github-repos-devops-flow-analytics/6bd09d1c-1cfc-40f5-b3f1-a62dec6f6b9a/scratchpad *)",
+      "Bash(echo \"exitcode=$?\")",
+      "Bash(ls -1 /Users/flofonic/github_repos)",
+      "Read(//Users/flofonic/github_repos/**)",
+      "Bash(ls -1 ~/.ssh 2>/dev/null || echo \"no ~/.ssh directory\")",
+      "Read(//Users/flofonic/.ssh/**)",
+      "Bash(ssh -o StrictHostKeyChecking=accept-new -T git@github.com)",
+      "Bash(ssh -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes -i ~/.ssh/github_sshkey_fluxpiada -T git@github.com)",
+      "Bash(ssh -v -o IdentitiesOnly=yes -o BatchMode=yes -i ~/.ssh/id_ed25519 -T git@github.com)",
+      "Bash(ssh-keygen -lf ~/.ssh/id_ed25519.pub)",
+      "Bash(ssh-keygen -lf ~/.ssh/github_sshkey_fluxpiada.pub)",
+      "Bash(gh auth *)",
+      "Bash(ssh -o IdentitiesOnly=yes -i ~/.ssh/github_sshkey_fluxpiada -T git@github.com)",
+      "Bash(ls -a /Users/flofonic/github_repos/meta_photo_db)",
+      "Read(//Users/flofonic/github_repos/meta_photo_db/**)"
+    ],
+    "additionalDirectories": [
+      "/private/tmp/flowcheck/MOD",
+      "/tmp/flowcheck/MOD",
+      "/private/tmp/claude-501/-Users-flofonic-github-repos-devops-flow-analytics/6bd09d1c-1cfc-40f5-b3f1-a62dec6f6b9a/scratchpad/out2/MOD"
+    ]
+  }
+}
