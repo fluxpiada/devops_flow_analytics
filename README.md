@@ -1,249 +1,124 @@
-# devops_flow — business case testautomatisering
+# devops_flow — flow- en sprintmetrics uit Jira, voor Excel
 
-Meet doorlooptijd, inspanning en flow-efficiëntie van ontwikkel- en testwerk op
-basis van wat Jira en TestRail al registreren — géén urenregistratie nodig — en
-zet dat om in een onderbouwd beslisrapport (Markdown + Word) en een
-managementdeck (PowerPoint).
+Leest de statusgeschiedenis van een Jira-project en zet die om in de standaard
+Kanban- en Scrum-metrics. Python meet alleen; Excel presenteert. Geen
+urenregistratie nodig, read-only.
 
-## De vraag, en het antwoord
+## Wat het meet
 
-**Vraag:** moeten we het (regressie)testen van het incassoproces automatiseren?
+Alle duren in **werkdagen**: weekenden en Nederlandse feestdagen tellen niet mee.
 
-**Antwoord in drie zinnen.** Eén handmatige regressieronde kost tientallen
-persoonstestdagen en beslaat weken, terwijl die uren nu nauwelijks gemaakt
-worden — regressie draait zelden. Het team wil het proces refactoren en moet
-daarvoor wekelijks kunnen regressietesten, wat handmatig fysiek onmogelijk is.
-De business case is dus geen besparingscase op bestaande uren maar een
-**enabler-case**: automatisering maakt de kwaliteitsborging mogelijk die de
-verbouwing van het incassoproces vereist.
+| Metric | Definitie |
+| --- | --- |
+| Cycle time | eerste stap naar een *In Progress*-status → laatste stap naar *Done* |
+| Lead time | aangemaakt → *Done* |
+| Work item age | eerste *In Progress* → nu, voor werk dat nu *In Progress* staat |
+| Doorvoer | afgeronde items per week |
+| WIP / CFD | per werkdag het aantal items per status |
+| Velocity, say/do | uit Jira's eigen Sprint Report: toegezegd, toegevoegd, verwijderd, afgerond |
 
-Elk getal in het rapport is herleidbaar tot Jira of TestRail, of expliciet als
-aanname gelabeld. Het rapport (`_report.md` / `.docx`) is het hoofddocument; het
-deck is de management-samenvatting.
+Statuscategorieën komen uit Jira zelf (`statusCategory`), op status-id: de
+changelog bewaart statusnamen zoals ze toen heetten, soms in een andere taal,
+dus een naam zegt niets. Epics en subtaken tellen niet mee. Issues waarvan alle overgangen binnen een uur
+vallen (achteraf bijgewerkt) krijgen de vlag `backfilled` en vallen buiten de
+percentielen.
 
-## Begrippen (kort — het rapport definieert ze voluit, bron: ISTQB Glossary)
+## Installeren en draaien
 
-- **Regressietest** — opnieuw testen ná een wijziging om te bewaken dat wat
-  wérkte blíjft werken.
-- **Hertest / confirmatietest** — een gefaalde test opnieuw draaien ná de
-  bugfix. Dit is géén regressietest.
-- **Wijzigingstest (non-regressie)** — valideert dat nieuwe/gewijzigde
-  functionaliteit werkt; bewijst niet dat het bestaande intact bleef.
-- **De-facto regressietest** — eigen operationele term: een testgeval dat
-  opnieuw is uitgevoerd terwijl het eerder slaagde (pass→rerun) —
-  regressiegedrag zonder het label.
-- **Persoonstestdag** — één tester, één werkdag testen. De rekeneenheid.
-- **Flow-efficiëntie** — actieve tijd gedeeld door doorlooptijd (Lean/SAFe).
+Vereist [uv](https://docs.astral.sh/uv/) en een `creds.yaml` (zie
+`creds.yaml.example`: Jira Data Center-PAT, Bearer).
 
-## Methode in het kort
-
-De analyse is een keten; elke stap staat op zichzelf en draagt zijn eigen
-verantwoording (rapport §11, `docs/technisch-ontwerp.md`):
-
-1. **Koppeling** — de story wordt uit de `refs`/naam van de TestRail-run
-   afgeleid; klopt een opgegeven `--jira` niet, dan stopt het script (anders is
-   het resultaat consistent maar onjuist).
-2. **Jira-levenscyclus** — statusovergangen van story + subtaken uit de
-   changelog → tijd-per-status en fasegrenzen.
-3. **TestRail-executie** — her-executies per test, first-pass-rate, en een
-   effort-proxy uit de tijdstempels tussen resultaten (er zijn geen uren
-   geregistreerd).
-4. **Corpus + cache** — één suite-brede scan van alle runs (frequentie,
-   automatiseringsgraad), gecachet zodat de analyse daarna offline draait.
-5. **De-facto regressie** — cross-run pass→rerun-detectie: maakt de ongelabelde
-   regressiepraktijk zichtbaar.
-6. **Waardestroom** — per stap actieve tijd vs wachttijd → flow-efficiëntie, met
-   een geautomatiseerd scenario ernaast.
-7. **ROI-model** — gevoeligheidsbanden i.p.v. schijnprecisie; een doelcadans
-   (wekelijks / per sprint) als beslissend scenario.
-
-## Artefacten per run
-
-Alles landt in **`output/<JIRA-KEY>/`** (één onderzoek = één map):
-
-- `…_report.md` en `…_report.docx` — het beslisrapport (Word via pandoc, indien
-  aanwezig).
-- `…json` — alle cijfers, herbruikbaar.
-- CSV's — `runs`, `defects`, `timeline`, `wsteps`, `devtest`, en (met corpus)
-  `defacto_regression`.
-- met `--deck`: `deck_content.md` (bewerkbaar checkpoint) +
-  `testauto_businesscase_mgmt.pptx`.
-
-## Gebruik
+macOS / Linux:
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
-
-# analyse van één testrun (snel, zonder historie-scan)
-uv run python scripts/testauto_businesscase.py --run 26442 --skip-corpus
-
-# volledig: frequentie-historie van de hele suite
-# (~7 min de eerste keer; daarna seconden uit de corpus-cache)
-uv run python scripts/testauto_businesscase.py --run 26442
-
-# alles in één commando: data + rapport + Word + deck
-uv run --with python-pptx python scripts/testauto_businesscase.py --run 26442 --deck
-
-# managementdeck los uit de laatste analyse (bewerk-checkpoint → render)
-uv run --with python-pptx python scripts/build_mgmt_deck.py --emit-content
-uv run --with python-pptx python scripts/build_mgmt_deck.py --content output/<KEY>/deck_content.md
+uv run devops-flow MOD                      # laatste 6 maanden, met cache
+uv run devops-flow MOD --months 12 --refresh
 ```
 
-### Andere dataset dan het incassoproces
+Windows (PowerShell):
 
-De tool is niet aan de incasso-seed gebonden:
-
-| Wat je wilt | Optie |
-|---|---|
-| Andere story/run | `--jira KEY --run ID` (of alleen `--run`, story uit de refs) |
-| Andere workflow-statusnamen | `--status-dev "In Progress" --status-test "In testing"` |
-| Andere projecten voor wijzigingsdruk | `--jql-projects "S34, KFDO"` (default: prefix van de story) |
-
-De W-code-herkenning voor processtappen is incasso-specifiek; voor een ander
-domein blijven die tabellen leeg en staat de rest gewoon.
-
-### Handige opties
-
-| Wat je wilt | Optie |
-|---|---|
-| Historie-scan overslaan | `--skip-corpus` |
-| Corpus-cache negeren en vers scannen | `--refresh-corpus` |
-| Ander cachebestand | `--corpus-cache PATH` |
-| Drempel "terugkerende case" (de-facto) | `--recurrence-min 3` |
-| Portfolio-analyse via een epic | `--epic KFDO-123` |
-| Historie-scan beperken | `--max-runs 20` |
-| Ander pad naar credentials | `--creds ../fo_doc_gen/creds.yaml` |
-| Doorgaan zonder Jira-koppeling | `--allow-unlinked` |
-
-De corpus-cache is suite-gebonden (`output/corpus_cache_p<project>_s<suite>.json`)
-en wordt door elke story op die suite gedeeld. Word-export vraagt `pandoc`;
-ontbreekt dat, dan print het script het handmatige commando
-(`pandoc <report>.md --from gfm -o <report>.docx`) en gaat door.
-
-Het deck komt volledig uit `deck_content.md`: élke tekst, tabel en tijdlijnstap
-staat als bewerkbare regel in dat checkpoint. Bewerk het en render met
-`--content`; niets zit meer hardcoded in de renderer.
-
-## Flow-analyse per project
-
-Naast de business case per story zit er een **projectbrede flow-analyse** in de
-repo: hoe lang blijft werk in een Jira-project hangen in *To Do*, *In Progress*
-en *Done*, welke losse statussen kosten die tijd, en verbetert dat per sprint?
-Een cumulative-flow-diagram-vraag, beantwoord uit de changelog — read-only en
-zonder urenregistratie.
-
-```bash
-# venster is standaard 6 maanden; interactief biedt hij 12 aan
-uv run python scripts/jira_flow_analysis.py \
-    --jira-url https://jira.vitens.lan/jira/browse/MOD
-
-# niet-interactief, expliciet venster, verse fetch
-uv run python scripts/jira_flow_analysis.py --project MOD --months 12 --refresh
+```powershell
+winget install --id=astral-sh.uv -e        # of: irm https://astral.sh/uv/install.ps1 | iex
+uv sync
+uv run devops-flow MOD
+uv run devops-flow MOD --creds C:\Users\<naam>\github_repos\fo_doc_gen\creds.yaml
 ```
 
-Het venster wordt **naar sprintgrenzen gesnapt**: alleen afgeronde sprints die
-volledig binnen de gevraagde periode vallen tellen mee. Bij een sprint die aan
-het eind van het venster wordt afgekapt tellen namelijk alleen de issues mee die
-er vóór de knip al klaar waren; het tragere werk dat erna afrondde valt buiten
-beeld en trekt de gemeten doorlooptijd van die randperiode omlaag. Vandaar dat
-het venster krimpt naar de echte sprintgrenzen. Het rapport toont zowel het
-gevraagde als het gebruikte venster.
+Niet getest op Windows. De code gebruikt geen POSIX-specifieke paden, maar dat
+is niet geverifieerd.
 
-Alles is in **werkdagen** — weekenden én Nederlandse landelijke feestdagen
-tellen niet mee (op MOD scheelt dat ruim 2 dagen per issue). De kop is de
-**mediaan**: de helft van de issues zit eronder, de helft erboven. Naast dat ene
-getal staat een **verdeling**, want een mediaan verbergt of er één soort werk is
-of twee.
+| Optie | |
+| --- | --- |
+| `MOD` of een Jira-URL | het project (`…/browse/MOD-123` mag ook) |
+| `--months N` | venster, default 6 |
+| `--refresh` | negeer de cache en haal vers op |
+| `--board ID` | ander scrumboard (default: het board waar de sprints van het project ontstaan) |
+| `--creds PAD` | default: zoekt in de werkdirectory, de repo en fo_doc_gen |
 
-Drie dingen die het rapport expliciet apart houdt:
+## Wat eruit komt
 
-- **Doorvoer in plaats van "tijd in Done".** Zodra een issue zijn eindstatus
-  bereikt stopt de meting, dus een verblijfsduur in Done bestaat niet. Wat de
-  Done-band in een cumulative flow diagram wél zegt is hoevéél werk eruit komt —
-  dat staat er als doorvoer per sprint.
-- **Bulk aangemaakte issues.** Bij een backlog-import krijgen tientallen issues
-  dezelfde `created`, en dan meet hun To Do-tijd hoe lang geleden de backlog is
-  ingeladen in plaats van hoe lang iemand op het werk wachtte. Het rapport
-  benoemt de importmomenten en splitst de doorlooptijd in twee cohorten. Op MOD
-  is dat 86 werkdagen voor de geïmporteerde issues tegen 43 voor los aangemaakte
-  — precies het dubbele, dus het onderscheid is geen detail.
-- **Actief aandeel**: de tijd in een In Progress-status gedeeld door de
-  doorlooptijd. Let op dat dit géén flow-efficiëntie is in de zin van de
-  waardestroom (§7 van het technisch ontwerp) — een issue dat een weekend in
-  "Test" staat telt hier als actief.
+In `output/<PROJECT>/`, elke run overschreven:
 
-| Wat je wilt | Optie |
-|---|---|
-| Ander venster | `--months 12` |
-| Alleen bepaalde issuetypes | `--issue-types "Story,Bug"` |
-| Subtaken meenemen | `--include-subtasks` |
-| Kalendervenster i.p.v. sprintgrenzen | `--no-sprint-snap` |
-| Cache negeren en live ophalen | `--refresh` |
-| Ander cachebestand | `--flow-cache PATH` |
+- `dashboard_<PROJECT>.xlsx` — kerncijfers (formules), cycle-time-scatter met
+  P50/P85, doorvoer per week, cumulative flow, leeftijd lopend werk,
+  sprints toegezegd vs afgerond (plus velocity als het team in punten schat)
+- `items.csv` — één rij per issue
+- `daily.csv` — één rij per werkdag, een kolom per status plus `wip`
+- `sprints.csv` — één rij per afgesloten sprint
+- `time_in_status.csv` — werkdagen per issue per status
 
-Artefacten landen in **`output/<PROJECT>/`**: `…_report.md` (het hoofddocument),
-`…json`, en CSV's `_issues` (per issue de dagen per categorie), `_statuses` en
-`_sprints`. De opgehaalde issues worden gecachet in
-`output/<PROJECT>/jira_flow_cache_<PROJECT>.json`, zodat een tweede analyse geen
-volledige changelog-fetch meer kost.
+De CSV's zijn voor een Nederlandstalige Excel geschreven (UTF-8 met BOM, `;`,
+decimale komma) en openen met een dubbelklik in kolommen.
 
-**Statuscategorieën komen uit Jira zelf** (`statusCategory` uit de workflow van
-het project), niet uit een hardgecodeerde lijst statusnamen — dit script deelt
-dus niet de `--status-dev/--status-test`-beperking van de business case.
+## Zelf testen
 
-### Zelftest
+Stap voor stap, vanuit de repo-map. Op Windows zijn de commando's in
+PowerShell gelijk, behalve het openen van het dashboard (stap 3).
 
-Het rekenwerk waar een fout stil doorwerkt in het rapport — feestdagen,
-werkdagenduur, percentielen, het parsen van sprintstrings, bulk-detectie — staat
-onder een offline zelftest. Geen netwerk, geen creds, geen cache:
+1. **Rekenwerk** — offline, geen creds of netwerk nodig:
 
-```bash
-uv run python scripts/selftest_flow.py        # stil bij succes
-uv run python scripts/selftest_flow.py -v     # toont elke check
-```
+   ```bash
+   uv run pytest
+   ```
 
-Draai hem na elke wijziging in `jira_core.py` of `jira_flow_analysis.py`.
-Exitcode 0 = alles goed, 1 = er faalde iets.
+   Verwacht: `22 passed`. Faalt er iets, dan is het rekenwerk (feestdagen,
+   werkdagen, cycle time, CFD, sprints) stuk; draai dan niet verder.
 
-## Credentials
+2. **Een echte run** — VPN aan, `creds.yaml` aanwezig:
 
-Zet een `creds.yaml` in de repo (gitignored) of laat het script terugvallen op
-dat van fo_doc_gen — het zoekt in de werkdirectory, naast het script, en als
-laatste in `~/github_repos/fo_doc_gen/`. Zie `creds.yaml.example`.
+   ```bash
+   uv run devops-flow MOD --refresh
+   ```
 
-Jira draait op Data Center en gebruikt een Personal Access Token (Bearer, geen
-Basic auth); het `/jira`-contextpad wordt automatisch gedetecteerd. TestRail
-gebruikt Basic auth met een API-key.
+   Verwacht: een regel `board …: N afgesloten sprints in het venster` en een
+   afsluitende `✓ … issues (… afgerond), N sprints → output/MOD`.
+   Meldingen die je kunt tegenkomen:
+   - `Jira niet bereikbaar` (de run stopt) — VPN of `jira.base_url` in `creds.yaml`.
+   - `⚠️ onbekende status-ids` — die statussen tellen als To Do; meld het.
+   - `⚠️ … geen sprintmetrics` — geen scrumboard gevonden; geef er een op met
+     `--board ID` (het id staat in de board-URL: `…?rapidView=727`). Hetzelfde
+     als de `board …`-regel een ander board noemt dan je verwacht.
 
-## Cases
+3. **Het dashboard** — open `output/MOD/dashboard_MOD.xlsx`
+   (macOS `open output/MOD/dashboard_MOD.xlsx`, Windows
+   `start output\MOD\dashboard_MOD.xlsx`). Excel rekent de kerncijfers bij
+   het openen uit; staan er lege cellen of `#WAARDE!`, druk dan op F9.
 
-- `cases/incasso_2026/` — business case testautomatisering incassoproces:
-  rapport, managementdeck en brondata.
+4. **Klopt het met Jira?** Twee steekproeven:
+   - Sprints: open in Jira *Rapporten → Sprintrapport* (*Reports → Sprint
+     Report*) voor een sprint en vergelijk met die rij in `sprints.csv`
+     (toegezegd, toegevoegd, verwijderd, afgerond).
+   - Cycle time: kies een afgerond issue in `items.csv`, open de *Geschiedenis*
+     (*History*) in Jira en tel de werkdagen van de eerste stap naar een
+     In Progress-status tot de laatste stap naar Done.
 
-## Beperkingen en aannames
+5. **Tweede run** (zonder `--refresh`) moet `… issues uit cache` melden en in
+   seconden klaar zijn.
 
-Bewust expliciet, want ze bepalen de interpretatie. Het rapport (§11.5) geeft per
-aanname de **basis**: industriereferentie, lokale inschatting (te vervangen door
-pilotmeting), of organisatieconventie. De meeste modelparameters zijn géén
-industrienorm — dat staat er ook zo.
+## Archief
 
-- **Uren worden nergens geregistreerd** (geen worklogs, geen estimates, TestRail
-  `elapsed` vrijwel leeg). Inspanning is afgeleid uit timestamps en is een
-  **ondergrens**; het ROI-model rekent met expliciete aannamebanden.
-- **De waardestroom leest twee workflow-statussen** (default `In Progress` /
-  `In testing`, override met `--status-dev/--status-test`). Stories die de
-  teststatus niet doorlopen geven een onvolledige tijdlijn — zelf een bevinding.
-- **De W-code-herkenning is incasso-specifiek.**
-- **Alle TestRail-testers gelden als systeemtesters (aanname).** `get_users`
-  geeft 403. **Business-acceptatietests (BAT/key-usertests) zitten níet in de
-  TestRail-data** en vallen buiten elke meting.
-- **De de-facto-regressiedetectie leest eindstatussen per run** (in-run
-  fail→pass leest als "passed") en ziet geen runs bínnen testplannen — de
-  volumes zijn ondergrenzen.
-
-## Verantwoording
-
-[`docs/technisch-ontwerp.md`](docs/technisch-ontwerp.md) beschrijft de keten in
-volgorde: welke call, welk veld, welke afleiding, welke aanname — inclusief een
-tabel die per grootheid aangeeft of hij **gemeten**, **afgeleid** of
-**aangenomen** is, en waaróm elke stap zo werkt.
+De business case testautomatisering (incasso, TestRail, managementdeck) staat
+bevroren in [`archive/business_case/`](archive/business_case/); tag `devops_01`
+is de staat van vóór dit herontwerp.
