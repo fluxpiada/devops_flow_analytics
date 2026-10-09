@@ -129,9 +129,12 @@ def test_months_ago_clamps():
 def test_time_in_status_hours_and_visits():
     wf = metrics.Workflow(WF)
     _, tis = metrics.items_table([REWORK], wf, NOW)
-    t4 = {r["status"]: (r["visits"], r["pt_hours"], r["lt_hours"]) for r in tis}
-    assert t4 == {"Te doen": (1, 4.0, 4.0), "In uitvoering": (2, 12.0, 28.0),
-                  "Review": (2, 8.0, 40.0)}
+    t4 = {r["status"]: (r["visits"], r["pt_hours"], r["lt_hours"], r["sent_back"])
+          for r in tis}
+    # Review → In uitvoering is terugsturen; daarna weer naar Review is gewoon
+    # vooruit — dat tweede bezoek aan Review is géén rework van Review.
+    assert t4 == {"Te doen": (1, 4.0, 4.0, 0), "In uitvoering": (2, 12.0, 28.0, 1),
+                  "Review": (2, 8.0, 40.0, 0)}
 
 
 def test_value_stream():
@@ -146,15 +149,17 @@ def test_value_stream():
                              "pt_mode_from_h": 8, "pt_mode_to_h": 16, "pt_median_h": 8.0,
                              "lt_mode_from_h": 4, "lt_mode_to_h": 8, "lt_median_h": 48.0,
                              "ca_pct": 100}
-    # In uitvoering: T-2 staat er nog (telt niet mee), T-4 kwam terug → 50%.
+    # In uitvoering: T-2 staat er nog (telt niet mee), T-4 werd teruggestuurd → 50%.
     assert by["In uitvoering"]["items"] == 2
     assert by["In uitvoering"]["ca_pct"] == 50
+    # Review: T-4 kwam er twee keer, maar werd er nooit náártoe teruggestuurd.
+    assert by["Review"]["ca_pct"] == 100
     # PT [16, 12]: klassen 16–32 en 8–16, gelijkspel → 8–16.
     assert (by["In uitvoering"]["pt_mode_from_h"], by["In uitvoering"]["pt_median_h"]) == (8, 14.0)
     assert (by["Review"]["lt_mode_from_h"], by["Review"]["lt_mode_to_h"]) == (16, 32)
     assert by["Review"]["lt_median_h"] == 32.0
     assert totals == {"pt_h": 30.0, "lt_h": 118.0, "activity_pct": 25,
-                      "rolled_ca_pct": 25}
+                      "rolled_ca_pct": 50}
 
 
 def test_value_stream_skips_backfilled():
@@ -170,3 +175,15 @@ def test_learn_order_follows_the_data():
     wf = metrics.Workflow({"4": ("Review", "In Progress"), **WF})
     wf.learn_order([DONE, OPEN, REWORK])
     assert [n for n, _ in wf.statuses.values()][:3] == ["Te doen", "In uitvoering", "Review"]
+
+
+def test_first_visit_from_a_later_step_is_not_rework():
+    # Te doen → Review → In uitvoering: dev overgeslagen en daarna alsnog
+    # opgepakt. In uitvoering was er nooit eerder, dus niets is teruggestuurd.
+    skipped_dev = issue("T-5", "2026-01-05T09:00:00.000+0100", [
+        ("2026-01-05T10:00:00.000+0100", "To Do", "Review"),
+        ("2026-01-05T11:00:00.000+0100", "Review", "In Progress"),
+        ("2026-01-05T12:00:00.000+0100", "In Progress", "Done"),
+    ], "Done", "2026-01-05T12:00:00.000+0100")
+    _, tis = metrics.items_table([skipped_dev], metrics.Workflow(WF), NOW)
+    assert all(r["sent_back"] == 0 for r in tis)

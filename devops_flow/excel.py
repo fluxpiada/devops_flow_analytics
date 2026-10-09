@@ -293,7 +293,7 @@ def _value_stream_sheet(wb: Workbook, project: str, steps: list[dict],
     ws["B2"].font = Font(bold=True)
     ws["B3"] = ("PT = uren binnen kantooruren (09–17) in de status — een proxy, géén "
                 "gemeten inspanning · LT = kloktijd in de status · %C&A = aandeel dat "
-                "de stap verliet en er niet naar terugkwam · eerst de modale klasse "
+                "de stap verliet en er niet naar werd teruggestuurd · eerst de modale klasse "
                 "(verdubbelend: 1–2, 2–4, 4–8 h …), dan de mediaan · backfilled items "
                 "tellen niet mee")
     ws["B3"].font = Font(italic=True, size=9, color="595959")

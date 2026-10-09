@@ -10,7 +10,7 @@ De waardestroom rekent per stap (status) in uren:
 
 - PT    = uren binnen kantooruren in de status (proxy, geen gemeten inspanning)
 - LT    = kloktijd in de status
-- %C&A  = aandeel items dat de stap verliet en er nooit naar terugkwam
+- %C&A  = aandeel items dat de stap verliet en er nooit naar werd teruggestuurd
 """
 
 from __future__ import annotations
@@ -76,6 +76,11 @@ class Workflow:
             statistics.mean(firsts[kv[0]]) if kv[0] in firsts else math.inf,
             known.index(kv[0]))))
 
+    def is_later(self, a: str | None, b: str | None) -> bool:
+        """Staat `a` verder in de flow dan `b`? Onbekende statussen: nee."""
+        known = list(self.statuses)
+        return a in known and b in known and known.index(a) > known.index(b)
+
     def ordered(self, ids: set[str]) -> list[str]:
         """Per categorie, dan in de volgorde van de workflow."""
         known = list(self.statuses)
@@ -132,6 +137,25 @@ def _done(issue: dict, trans: list, wf: Workflow) -> datetime | None:
     return done or parse_dt(f.get("resolutiondate") or f["created"])
 
 
+def _sent_back(trans: list, first: str | None, wf: Workflow,
+               stop: datetime) -> Counter:
+    """Per status: hoe vaak het werk ernaar werd teruggestuurd.
+
+    Teruggestuurd = een stap vanuit een latere status naar een status waar het
+    item al eerder was (Test → In uitvoering). Dat is rework van díe status.
+    Het opnieuw doorlopen van Test ná de fix telt níet tegen Test: Test deed
+    zijn werk juist goed door de fout te vinden.
+    """
+    seen, out = {first}, Counter()
+    for ts, frm, to in trans:
+        if ts >= stop:
+            break
+        if to in seen and wf.is_later(frm, to):
+            out[to] += 1
+        seen.add(to)
+    return out
+
+
 def item_row(issue: dict, wf: Workflow, now: datetime) -> tuple[dict, list[dict]]:
     """Eén issue → (rij voor items.csv, rijen tijd per status)."""
     f = issue["fields"]
@@ -149,6 +173,7 @@ def item_row(issue: dict, wf: Workflow, now: datetime) -> tuple[dict, list[dict]
         st["visits"] += 1
         st["pt_hours"] += office_hours_between(a, b)
         st["lt_hours"] += (b - a).total_seconds() / 3600
+    sent_back = _sent_back(trans, trans[0][1] if trans else current, wf, stop)
 
     def wd(a, b):
         return round(workdays_between(a, b), 1) if a and b else None
@@ -175,6 +200,7 @@ def item_row(issue: dict, wf: Workflow, now: datetime) -> tuple[dict, list[dict]
     tis = [{"key": issue["key"], "status": wf.name(sid), "category": wf.category(sid),
             "workdays": round(st["workdays"], 2), "visits": st["visits"],
             "pt_hours": round(st["pt_hours"], 1), "lt_hours": round(st["lt_hours"], 1),
+            "sent_back": sent_back[sid],
             # Staat het item hier nú nog? Dan is het laatste bezoek niet af.
             "current": sid == current and done is None}
            for sid, st in per_status.items()]
@@ -215,8 +241,8 @@ def value_stream(tis: list[dict], wf: Workflow,
     Een stap is elke To Do- of In Progress-status; Done is het eind van de
     stroom en krijgt geen blok.
     - PT/LT: over items die de stap verlieten (een lopend bezoek is niet af).
-    - %C&A: van de items die de stap verlieten, het deel dat er nooit naar
-      terugkwam. Een item dat nu wéér in de stap staat telt dus als rework.
+    - %C&A: van de items die de stap verlieten, het deel dat er nooit vanuit
+      een latere stap naar werd teruggestuurd (zie `_sent_back`).
     `skip`: sleutels die niet meetellen (backfilled items, net als bij de percentielen).
     """
     names = [n for n, _ in wf.statuses.values()]
@@ -243,8 +269,8 @@ def value_stream(tis: list[dict], wf: Workflow,
             "pt_median_h": round(statistics.median(pt), 1) if pt else None,
             "lt_mode_from_h": lt_lo, "lt_mode_to_h": lt_hi,
             "lt_median_h": round(statistics.median(lt), 1) if lt else None,
-            "ca_pct": round(100 * sum(1 for r in ca_pop if r["visits"] == 1
-                                      and not r["current"]) / len(ca_pop)),
+            "ca_pct": round(100 * sum(1 for r in ca_pop if not r["sent_back"])
+                            / len(ca_pop)),
         })
 
     pt_total = sum(s["pt_median_h"] or 0 for s in steps)
