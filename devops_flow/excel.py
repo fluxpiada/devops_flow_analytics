@@ -23,6 +23,7 @@ from openpyxl.chart import (
     Series,
 )
 from openpyxl.chart.shapes import GraphicalProperties
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
@@ -86,10 +87,11 @@ def _rng(sheet: str, col: str, n: int) -> str:
 
 def write_workbook(path: Path, project: str, items: list[dict], tis: list[dict],
                    daily: tuple[list[str], list[list]], sprints: list[dict],
-                   window_start: date) -> Path:
+                   window_start: date, stream: tuple[list[dict], dict]) -> Path:
     wb = Workbook()
     dash = wb.active
     dash.title = "Dashboard"
+    _value_stream_sheet(wb, project, *stream)
 
     ih, ir = as_rows(items)
     _, ic = _sheet(wb, "Items", ih, ir)
@@ -239,6 +241,85 @@ def write_workbook(path: Path, project: str, items: list[dict], tis: list[dict],
     wb.calculation.fullCalcOnLoad = True  # formules zonder cachewaarde: Excel rekent bij openen
     wb.save(path)
     return path
+
+
+# ── waardestroom ─────────────────────────────────────────────────────────────
+
+_BLUE, _NOTE, _ARROW = "4A72B8", "EDBB5F", "EDA93A"
+_PER_ROW = 4  # blokken per rij, zoals een waardestroomkaart op een wand
+
+
+def _hours(v: float | None) -> str:
+    return "—" if v is None else f"{v:g}".replace(".", ",")
+
+
+def _whole(v: float | None) -> str:
+    return "—" if v is None else f"{v:.0f}"
+
+
+def _span(step: dict, kind: str) -> str:
+    """De modale klasse als "64–128"."""
+    lo, hi = step[f"{kind}_mode_from_h"], step[f"{kind}_mode_to_h"]
+    return "—" if lo is None else f"{_hours(lo)}–{_hours(hi)}"
+
+
+def _box(ws, top: int, left: int, height: int, width: int, text: str,
+         fill: str, font: Font) -> None:
+    """Een samengevoegd vlak met gecentreerde, omlopende tekst."""
+    ws.merge_cells(start_row=top, start_column=left,
+                   end_row=top + height - 1, end_column=left + width - 1)
+    cell = ws.cell(top, left, text)
+    cell.font, cell.alignment = font, Alignment(horizontal="center", vertical="center",
+                                                wrap_text=True)
+    for r in range(top, top + height):
+        for c in range(left, left + width):
+            ws.cell(r, c).fill = PatternFill("solid", fgColor=fill)
+
+
+def _value_stream_sheet(wb: Workbook, project: str, steps: list[dict],
+                        totals: dict) -> None:
+    """Waardestroomkaart van cellen: per stap een blauw blok met een geel
+    briefje (PT, LT, %C&A — modus en mediaan), pijlen ertussen."""
+    ws = wb.create_sheet("Waardestroom", 1)
+    ws.sheet_view.showGridLines = False
+    ws["B1"] = f"Waardestroom — {project}"
+    ws["B1"].font = Font(bold=True, size=16)
+    def pct(v):
+        return "—" if v is None else f"{v}%"
+
+    ws["B2"] = (f"Totaal (som van de medianen): PT {_whole(totals['pt_h'])} h · "
+                f"LT {_whole(totals['lt_h'])} h · activiteit {pct(totals['activity_pct'])} · "
+                f"gerolde %C&A {pct(totals['rolled_ca_pct'])}")
+    ws["B2"].font = Font(bold=True)
+    ws["B3"] = ("PT = uren binnen kantooruren (09–17) in de status — een proxy, géén "
+                "gemeten inspanning · LT = kloktijd in de status · %C&A = aandeel dat "
+                "de stap verliet en er niet naar terugkwam · eerst de modale klasse "
+                "(verdubbelend: 1–2, 2–4, 4–8 h …), dan de mediaan · backfilled items "
+                "tellen niet mee")
+    ws["B3"].font = Font(italic=True, size=9, color="595959")
+
+    ws.column_dimensions["A"].width = 5  # pijl aan het begin van een vervolgrij
+    for k in range(_PER_ROW):
+        for i in range(3):
+            ws.column_dimensions[get_column_letter(2 + 4 * k + i)].width = 11
+        ws.column_dimensions[get_column_letter(5 + 4 * k)].width = 5
+
+    arrow = Font(size=22, bold=True, color=_ARROW)
+    for i, st in enumerate(steps):
+        row, k = divmod(i, _PER_ROW)
+        top, left = 5 + row * 10, 2 + 4 * k
+        _box(ws, top, left, 4, 3, st["step"].upper(), _BLUE,
+             Font(bold=True, size=13, color="FFFFFF"))
+        _box(ws, top + 4, left + 1, 5, 3,
+             f"PT: {_span(st, 'pt')} h (med {_whole(st['pt_median_h'])})\n"
+             f"LT: {_span(st, 'lt')} h (med {_whole(st['lt_median_h'])})\n"
+             f"%C&A: {st['ca_pct']}%\nn = {st['items']}",
+             _NOTE, Font(bold=True, size=10, color="404040"))
+        for r in range(top + 4, top + 9):
+            ws.row_dimensions[r].height = 16
+        if i + 1 < len(steps):  # pijl naar de volgende stap: rechts, of aan het begin van de volgende rij
+            r, c = (top + 1, left + 3) if k + 1 < _PER_ROW else (top + 11, 1)
+            ws.cell(r, c, "➜").font = arrow
 
 
 def col_idx(cols: dict[str, str], name: str) -> int:

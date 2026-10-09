@@ -36,6 +36,15 @@ OPEN = issue("T-2", "2026-01-05T09:00:00.000+0100", [
 SKIPPED = issue("T-3", "2026-01-05T09:00:00.000+0100", [
     ("2026-01-06T09:00:00.000+0100", "To Do", "Done")], "Done", "2026-01-06T09:00:00.000+0100")
 
+# Rework: Review stuurt terug naar In Progress, daarna opnieuw Review.
+REWORK = issue("T-4", "2026-01-05T09:00:00.000+0100", [
+    ("2026-01-05T13:00:00.000+0100", "To Do", "In Progress"),
+    ("2026-01-06T13:00:00.000+0100", "In Progress", "Review"),
+    ("2026-01-07T09:00:00.000+0100", "Review", "In Progress"),
+    ("2026-01-07T13:00:00.000+0100", "In Progress", "Review"),
+    ("2026-01-08T09:00:00.000+0100", "Review", "Done"),
+], "Done", "2026-01-08T09:00:00.000+0100")
+
 
 def rows():
     wf = metrics.Workflow(WF)
@@ -115,3 +124,49 @@ def test_months_ago_clamps():
     assert months_ago(datetime(2026, 3, 31), 6) == datetime(2025, 9, 30)
     assert months_ago(datetime(2024, 3, 31), 1) == datetime(2024, 2, 29)
     assert months_ago(datetime(2026, 1, 15), 12) == datetime(2025, 1, 15)
+
+
+def test_time_in_status_hours_and_visits():
+    wf = metrics.Workflow(WF)
+    _, tis = metrics.items_table([REWORK], wf, NOW)
+    t4 = {r["status"]: (r["visits"], r["pt_hours"], r["lt_hours"]) for r in tis}
+    assert t4 == {"Te doen": (1, 4.0, 4.0), "In uitvoering": (2, 12.0, 28.0),
+                  "Review": (2, 8.0, 40.0)}
+
+
+def test_value_stream():
+    wf = metrics.Workflow(WF)
+    _, tis = metrics.items_table([DONE, OPEN, SKIPPED, REWORK], wf, NOW)
+    steps, totals = metrics.value_stream(tis, wf)
+    by = {s["step"]: s for s in steps}
+    assert list(by) == ["Te doen", "In uitvoering", "Review"]  # Done krijgt geen blok
+    # Te doen: PT [8, 40, 8, 4] → klasse 8–16 (twee keer); LT [72, 168, 24, 4]
+    # → elke klasse één keer, gelijkspel → de kleinste: 4–8.
+    assert by["Te doen"] == {"step": "Te doen", "items": 4,
+                             "pt_mode_from_h": 8, "pt_mode_to_h": 16, "pt_median_h": 8.0,
+                             "lt_mode_from_h": 4, "lt_mode_to_h": 8, "lt_median_h": 48.0,
+                             "ca_pct": 100}
+    # In uitvoering: T-2 staat er nog (telt niet mee), T-4 kwam terug → 50%.
+    assert by["In uitvoering"]["items"] == 2
+    assert by["In uitvoering"]["ca_pct"] == 50
+    # PT [16, 12]: klassen 16–32 en 8–16, gelijkspel → 8–16.
+    assert (by["In uitvoering"]["pt_mode_from_h"], by["In uitvoering"]["pt_median_h"]) == (8, 14.0)
+    assert (by["Review"]["lt_mode_from_h"], by["Review"]["lt_mode_to_h"]) == (16, 32)
+    assert by["Review"]["lt_median_h"] == 32.0
+    assert totals == {"pt_h": 30.0, "lt_h": 118.0, "activity_pct": 25,
+                      "rolled_ca_pct": 25}
+
+
+def test_value_stream_skips_backfilled():
+    wf = metrics.Workflow(WF)
+    _, tis = metrics.items_table([DONE, REWORK], wf, NOW)
+    steps, _ = metrics.value_stream(tis, wf, skip={"T-4"})
+    assert {s["step"]: s["items"] for s in steps} == {"Te doen": 1, "In uitvoering": 1,
+                                                       "Review": 1}
+
+
+def test_learn_order_follows_the_data():
+    # Jira noemt Review vóór In Progress; de items lopen andersom.
+    wf = metrics.Workflow({"4": ("Review", "In Progress"), **WF})
+    wf.learn_order([DONE, OPEN, REWORK])
+    assert [n for n, _ in wf.statuses.values()][:3] == ["Te doen", "In uitvoering", "Review"]

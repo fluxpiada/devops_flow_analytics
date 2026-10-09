@@ -47,6 +47,7 @@ def main() -> None:
     print(f"→ {project}, {args.months} maanden (vanaf {since:%Y-%m-%d})")
     wf = metrics.Workflow(jira.statuses(client, project))
     issues = jira.fetch_issues(client, project, since, out / "cache.json", args.refresh)
+    wf.learn_order(issues)
     board, sprints = jira.closed_sprints(client, project, since, args.board)
     reports = [jira.sprint_report(client, board, s["id"]) for s in sprints]
     if sprints:
@@ -55,6 +56,7 @@ def main() -> None:
     items, tis = metrics.items_table(issues, wf, now)
     daily = metrics.daily_table(issues, wf, since.date(), now)
     sprint_rows = metrics.sprint_table(sprints, reports, items)
+    stream = metrics.value_stream(tis, wf, skip={r["key"] for r in items if r["backfilled"]})
     if wf.unknown:
         jira.warn(f"onbekende status-ids (tellen als To Do): {', '.join(sorted(wf.unknown))}")
 
@@ -63,11 +65,12 @@ def main() -> None:
         excel.write_csv(out / "items.csv", *excel.as_rows(items)),
         excel.write_csv(out / "time_in_status.csv", *excel.as_rows(tis)),
         excel.write_csv(out / "daily.csv", *daily),
+        excel.write_csv(out / "value_stream.csv", *excel.as_rows(stream[0])),
     ]
     if sprint_rows:
         paths.append(excel.write_csv(out / "sprints.csv", *excel.as_rows(sprint_rows)))
     paths.append(excel.write_workbook(out / f"dashboard_{project}.xlsx", project, items,
-                                      tis, daily, sprint_rows, since.date()))
+                                      tis, daily, sprint_rows, since.date(), stream))
 
     done = [r for r in items if r["done"] and not r["backfilled"]]
     print(f"\n✓ {len(items)} issues ({len(done)} afgerond), "

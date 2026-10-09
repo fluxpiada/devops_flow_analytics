@@ -7,6 +7,7 @@ from devops_flow.workdays import (
     dutch_holidays,
     easter,
     is_workday,
+    office_hours_between,
     workdays_between,
 )
 
@@ -53,3 +54,15 @@ def test_workdays_between(start, end, want):
 def test_count_workdays_christmas_week():
     # 21–27 dec 2026: ma–vr = 5, minus Eerste Kerstdag (vr); Tweede valt op za.
     assert count_workdays(date(2026, 12, 21), date(2026, 12, 28)) == 4
+
+
+@pytest.mark.parametrize("start, end, want", [
+    (datetime(2026, 1, 5, 10), datetime(2026, 1, 5, 12, 30), 2.5),  # binnen één dag
+    (datetime(2026, 1, 5, 6), datetime(2026, 1, 5, 8), 0.0),         # vóór kantoortijd
+    (datetime(2026, 1, 5, 16), datetime(2026, 1, 6, 10), 2.0),       # over de nacht
+    (datetime(2026, 1, 9, 15), datetime(2026, 1, 12, 11), 4.0),      # over het weekend
+    (datetime(2026, 1, 5, 9), datetime(2026, 1, 7, 17), 24.0),       # drie hele dagen
+    (datetime(2026, 5, 13, 9), datetime(2026, 5, 15, 17), 16.0),     # over Hemelvaart
+])
+def test_office_hours_between(start, end, want):
+    assert office_hours_between(start, end) == want

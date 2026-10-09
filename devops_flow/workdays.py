@@ -1,8 +1,12 @@
 """Werkdagen: ma–vr minus de Nederlandse landelijke feestdagen.
 
-Eén maat voor alle duren in deze tool. Een deel van een dag telt naar rato van
-het etmaal: er is nergens urenregistratie, dus een kantoorurenvenster (09–17)
-zou een precisie suggereren die de data niet heeft.
+Twee maten:
+- `workdays_between` — de eenheid van cycle time en lead time. Een deel van een
+  dag telt naar rato van het etmaal.
+- `office_hours_between` — alleen voor de PT (process time) van de waardestroom:
+  de tijd binnen kantooruren (09–17). Dat is een proxy, géén gemeten inspanning —
+  er is nergens urenregistratie. Een issue dat een middag "In uitvoering" staat
+  telt als 4 uur, of er nu aan gewerkt is of niet.
 """
 
 from __future__ import annotations
@@ -95,3 +99,28 @@ def workdays_between(start: datetime, end: datetime) -> float:
     if is_workday(e_day):  # aanloop van de einddag
         total += (end - datetime.combine(e_day, time.min)).total_seconds() / 86400
     return total
+
+
+OFFICE_START, OFFICE_END = 9, 17  # kantooruren, alleen voor de PT-proxy
+
+
+def _office_hours_on(day: date, start: datetime, end: datetime) -> float:
+    """Uren van [start, end) binnen de kantooruren van één dag."""
+    if not is_workday(day):
+        return 0.0
+    lo = max(start, datetime.combine(day, time(OFFICE_START)))
+    hi = min(end, datetime.combine(day, time(OFFICE_END)))
+    return max((hi - lo).total_seconds() / 3600, 0.0)
+
+
+def office_hours_between(start: datetime, end: datetime) -> float:
+    """Uren binnen kantooruren op werkdagen; alleen eerste en laatste dag geknipt."""
+    if end <= start:
+        return 0.0
+    s_day, e_day = start.date(), end.date()
+    if s_day == e_day:
+        return _office_hours_on(s_day, start, end)
+    return (_office_hours_on(s_day, start, end)
+            + count_workdays(s_day + timedelta(days=1), e_day)
+            * (OFFICE_END - OFFICE_START)
+            + _office_hours_on(e_day, start, end))

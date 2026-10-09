@@ -6,7 +6,7 @@ urenregistratie nodig, read-only.
 
 ## Wat het meet
 
-Alle duren in **werkdagen**: weekenden en Nederlandse feestdagen tellen niet mee.
+Per item in **werkdagen**: weekenden en Nederlandse feestdagen tellen niet mee.
 
 | Metric | Definitie |
 | --- | --- |
@@ -17,11 +17,26 @@ Alle duren in **werkdagen**: weekenden en Nederlandse feestdagen tellen niet mee
 | WIP / CFD | per werkdag het aantal items per status |
 | Velocity, say/do | uit Jira's eigen Sprint Report: toegezegd, toegevoegd, verwijderd, afgerond |
 
+**Waardestroom** — per stap (elke To Do- en In Progress-status, in de volgorde
+waarin het werk er werkelijk doorheen gaat) in **uren**:
+
+| | Definitie |
+| --- | --- |
+| PT (process time) | uren binnen kantooruren (09–17, werkdagen) in de status. Een proxy, géén gemeten inspanning: er is nergens urenregistratie |
+| LT (lead time) | kloktijd in de status, alle bezoeken opgeteld |
+| %C&A | aandeel items dat de stap verliet en er nooit naar terugkwam |
+
+Per stap staan de **modale klasse** (de meest voorkomende, in verdubbelende
+klassen 1–2, 2–4, 4–8 h …) en de **mediaan**. Alleen afgeronde bezoeken tellen:
+een item dat nu in een stap staat telt daar nog niet mee. Het totaal is de som
+van de medianen, met de activiteitsratio (PT/LT) en de gerolde %C&A (het
+product over alle stappen).
+
 Statuscategorieën komen uit Jira zelf (`statusCategory`), op status-id: de
 changelog bewaart statusnamen zoals ze toen heetten, soms in een andere taal,
-dus een naam zegt niets. Epics en subtaken tellen niet mee. Issues waarvan alle overgangen binnen een uur
-vallen (achteraf bijgewerkt) krijgen de vlag `backfilled` en vallen buiten de
-percentielen.
+dus een naam zegt niets. Epics en subtaken tellen niet mee. Issues waarvan alle
+overgangen binnen een uur vallen (achteraf bijgewerkt) krijgen de vlag
+`backfilled` en vallen buiten de percentielen en de waardestroom.
 
 ## Installeren en draaien
 
@@ -61,13 +76,18 @@ is niet geverifieerd.
 
 In `output/<PROJECT>/`, elke run overschreven:
 
-- `dashboard_<PROJECT>.xlsx` — kerncijfers (formules), cycle-time-scatter met
-  P50/P85, doorvoer per week, cumulative flow, leeftijd lopend werk,
-  sprints toegezegd vs afgerond (plus velocity als het team in punten schat)
+- `dashboard_<PROJECT>.xlsx` — tab *Dashboard*: kerncijfers (formules),
+  cycle-time-scatter met P50/P85, doorvoer per week, cumulative flow, leeftijd
+  lopend werk, sprints toegezegd vs afgerond (plus velocity als het team in
+  punten schat); tab *Waardestroom*: de waardestroomkaart, een blok per stap
+  met PT, LT en %C&A
 - `items.csv` — één rij per issue
 - `daily.csv` — één rij per werkdag, een kolom per status plus `wip`
 - `sprints.csv` — één rij per afgesloten sprint
-- `time_in_status.csv` — werkdagen per issue per status
+- `time_in_status.csv` — per issue per status: werkdagen, aantal bezoeken,
+  `pt_hours`, `lt_hours` en `current` (staat er nu nog) — de bron van de
+  waardestroom
+- `value_stream.csv` — één rij per stap van de waardestroom
 
 De CSV's zijn voor een Nederlandstalige Excel geschreven (UTF-8 met BOM, `;`,
 decimale komma) en openen met een dubbelklik in kolommen.
@@ -83,8 +103,9 @@ PowerShell gelijk, behalve het openen van het dashboard (stap 3).
    uv run pytest
    ```
 
-   Verwacht: `22 passed`. Faalt er iets, dan is het rekenwerk (feestdagen,
-   werkdagen, cycle time, CFD, sprints) stuk; draai dan niet verder.
+   Verwacht: `32 passed`. Faalt er iets, dan is het rekenwerk (feestdagen,
+   werkdagen, kantooruren, cycle time, CFD, sprints, waardestroom) stuk; draai
+   dan niet verder.
 
 2. **Een echte run** — VPN aan, `creds.yaml` aanwezig:
 
@@ -114,7 +135,13 @@ PowerShell gelijk, behalve het openen van het dashboard (stap 3).
      (*History*) in Jira en tel de werkdagen van de eerste stap naar een
      In Progress-status tot de laatste stap naar Done.
 
-5. **Tweede run** (zonder `--refresh`) moet `… issues uit cache` melden en in
+5. **Waardestroom narekenen** — kies een stap in `value_stream.csv`, filter
+   `time_in_status.csv` op die status met `current` = 0, en tel de items met
+   `visits` = 1: gedeeld door het aantal rijen (plus de rijen met `current` = 1
+   én `visits` > 1) is dat de %C&A. Kijk bij één item met `visits` > 1 in de
+   *Geschiedenis* of het echt terugkwam.
+
+6. **Tweede run** (zonder `--refresh`) moet `… issues uit cache` melden en in
    seconden klaar zijn.
 
 ## Archief
