@@ -31,11 +31,16 @@ def months_ago(now: datetime, months: int) -> datetime:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("project", help="Projectsleutel of Jira-URL, bv. MOD")
-    ap.add_argument("--months", type=int, default=6, help="Venster (default 6)")
-    ap.add_argument("--refresh", action="store_true", help="Negeer de cache")
-    ap.add_argument("--board", type=int, help="Scrumboard-id (default: het eerste)")
-    ap.add_argument("--creds", help="Pad naar creds.yaml")
-    ap.add_argument("--out-dir", default="output")
+    ap.add_argument("--months", type=int, default=6,
+                    help="Venster in maanden: afgerond in die periode plus alles wat open is "
+                         "(default 6)")
+    ap.add_argument("--refresh", action="store_true", help="Negeer de cache, haal vers op")
+    ap.add_argument("--board", type=int,
+                    help="Scrumboard-id (default: het board waar de sprints ontstaan)")
+    ap.add_argument("--creds", help="Pad naar creds.yaml (default: werkdirectory, repo, "
+                                    "fo_doc_gen)")
+    ap.add_argument("--out-dir", default="output",
+                    help="Map voor de resultaten; daaronder <PROJECT>/ (default output)")
     args = ap.parse_args()
 
     project = project_key(args.project)
@@ -56,7 +61,9 @@ def main() -> None:
     items, tis = metrics.items_table(issues, wf, now)
     daily = metrics.daily_table(issues, wf, since.date(), now)
     sprint_rows = metrics.sprint_table(sprints, reports, items)
-    stream = metrics.value_stream(tis, wf, skip={r["key"] for r in items if r["backfilled"]})
+    backfilled = {r["key"] for r in items if r["backfilled"]}
+    stream = metrics.value_stream(tis, wf, skip=backfilled)
+    limits = metrics.flag_items(items, skip=backfilled)
     if wf.unknown:
         jira.warn(f"onbekende status-ids (tellen als To Do): {', '.join(sorted(wf.unknown))}")
 
@@ -70,7 +77,7 @@ def main() -> None:
     if sprint_rows:
         paths.append(excel.write_csv(out / "sprints.csv", *excel.as_rows(sprint_rows)))
     paths.append(excel.write_workbook(out / f"dashboard_{project}.xlsx", project, items,
-                                      tis, daily, sprint_rows, since.date(), stream))
+                                      tis, daily, sprint_rows, since.date(), stream, limits))
 
     done = [r for r in items if r["done"] and not r["backfilled"]]
     print(f"\n✓ {len(items)} issues ({len(done)} afgerond), "

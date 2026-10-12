@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -7,8 +7,9 @@ from devops_flow.workdays import (
     dutch_holidays,
     easter,
     is_workday,
-    office_hours_between,
+    work_hours,
     workdays_between,
+    workdays_touched,
 )
 
 
@@ -57,12 +58,33 @@ def test_count_workdays_christmas_week():
 
 
 @pytest.mark.parametrize("start, end, want", [
-    (datetime(2026, 1, 5, 10), datetime(2026, 1, 5, 12, 30), 2.5),  # binnen één dag
-    (datetime(2026, 1, 5, 6), datetime(2026, 1, 5, 8), 0.0),         # vóór kantoortijd
-    (datetime(2026, 1, 5, 16), datetime(2026, 1, 6, 10), 2.0),       # over de nacht
-    (datetime(2026, 1, 9, 15), datetime(2026, 1, 12, 11), 4.0),      # over het weekend
-    (datetime(2026, 1, 5, 9), datetime(2026, 1, 7, 17), 24.0),       # drie hele dagen
-    (datetime(2026, 5, 13, 9), datetime(2026, 5, 15, 17), 16.0),     # over Hemelvaart
+    (datetime(2026, 1, 5, 10), datetime(2026, 1, 5, 12), 2.0),    # kort: de echte duur
+    (datetime(2026, 1, 5, 9), datetime(2026, 1, 5, 17), 8.0),     # precies 8 h
+    (datetime(2026, 1, 5, 16), datetime(2026, 1, 6, 10), 8.0),    # 18 h → één werkdag
+    (datetime(2026, 1, 5, 10), datetime(2026, 1, 6, 10), 8.0),    # precies 24 h
+    (datetime(2026, 1, 5, 10), datetime(2026, 1, 7, 10), 16.0),   # twee werkdagen
+    (datetime(2026, 1, 9, 15), datetime(2026, 1, 12, 11), 8.0),   # vr → ma: 20 h zonder weekend
+    (datetime(2026, 1, 10, 10), datetime(2026, 1, 10, 12), 0.0),  # zaterdag
+    (datetime(2026, 5, 13, 10), datetime(2026, 5, 18, 10), 16.0),  # over Hemelvaart: 48 h
 ])
-def test_office_hours_between(start, end, want):
-    assert office_hours_between(start, end) == want
+def test_work_hours(start, end, want):
+    assert work_hours(start, end) == pytest.approx(want)
+
+
+def test_work_hours_is_continuous():
+    # Geen sprong bij 8 h en bij 24 h: beide kanten geven ±8.
+    mon = datetime(2026, 1, 5)
+    for h in (8, 24):
+        assert work_hours(mon, mon + timedelta(hours=h - 0.01)) == pytest.approx(8, abs=0.01)
+        assert work_hours(mon, mon + timedelta(hours=h + 0.01)) == pytest.approx(8, abs=0.01)
+
+
+@pytest.mark.parametrize("start, end, want", [
+    (datetime(2026, 1, 5, 16), datetime(2026, 1, 6, 10), {date(2026, 1, 5), date(2026, 1, 6)}),
+    (datetime(2026, 1, 9, 15), datetime(2026, 1, 12, 11), {date(2026, 1, 9), date(2026, 1, 12)}),
+    (datetime(2026, 1, 10, 10), datetime(2026, 1, 11, 10), set()),   # weekend
+    (datetime(2026, 1, 5, 10), datetime(2026, 1, 5, 10), set()),     # nul seconden
+    (datetime(2026, 1, 5, 10), datetime(2026, 1, 6, 0), {date(2026, 1, 5)}),  # eindigt om 00:00
+])
+def test_workdays_touched(start, end, want):
+    assert workdays_touched(start, end) == want

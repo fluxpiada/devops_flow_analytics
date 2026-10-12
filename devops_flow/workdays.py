@@ -1,12 +1,13 @@
 """Werkdagen: ma–vr minus de Nederlandse landelijke feestdagen.
 
-Twee maten:
+Drie maten, één klok — weekend en feestdagen tellen nooit:
 - `workdays_between` — de eenheid van cycle time en lead time. Een deel van een
   dag telt naar rato van het etmaal.
-- `office_hours_between` — alleen voor de PT (process time) van de waardestroom:
-  de tijd binnen kantooruren (09–17). Dat is een proxy, géén gemeten inspanning —
-  er is nergens urenregistratie. Een issue dat een middag "In uitvoering" staat
-  telt als 4 uur, of er nu aan gewerkt is of niet.
+- `work_hours` — de PT van de waardestroom: korte verblijven in echte uren,
+  langere in werkdagen van 8 uur. Een proxy, géén gemeten inspanning — er is
+  nergens urenregistratie.
+- `workdays_touched` — de LT van de waardestroom: elke werkdag waarop een
+  verblijf valt telt helemaal (00:00–23:59 = 8 uur).
 """
 
 from __future__ import annotations
@@ -101,26 +102,30 @@ def workdays_between(start: datetime, end: datetime) -> float:
     return total
 
 
-OFFICE_START, OFFICE_END = 9, 17  # kantooruren, alleen voor de PT-proxy
+WORKDAY_H = 8  # één werkdag = 8 werkuur; 40 h = een werkweek
 
 
-def _office_hours_on(day: date, start: datetime, end: datetime) -> float:
-    """Uren van [start, end) binnen de kantooruren van één dag."""
-    if not is_workday(day):
-        return 0.0
-    lo = max(start, datetime.combine(day, time(OFFICE_START)))
-    hi = min(end, datetime.combine(day, time(OFFICE_END)))
-    return max((hi - lo).total_seconds() / 3600, 0.0)
+def work_hours(start: datetime, end: datetime) -> float:
+    """PT van één verblijf, in werkuren.
+
+    Eerst de verstreken tijd zonder weekend en feestdagen, in uren (h):
+    korter dan 8 → h zelf; 8–24 → 8 (één werkdag); langer → 8 per werkdag (h/3).
+    Doorlopend: bij 8 én bij 24 komt er 8 uit.
+    """
+    h = workdays_between(start, end) * 24
+    if h < WORKDAY_H:
+        return h
+    return float(WORKDAY_H) if h <= 24 else h * WORKDAY_H / 24
 
 
-def office_hours_between(start: datetime, end: datetime) -> float:
-    """Uren binnen kantooruren op werkdagen; alleen eerste en laatste dag geknipt."""
+def workdays_touched(start: datetime, end: datetime) -> set[date]:
+    """De werkdagen waarop [start, end) valt — elke dag helemaal (voor de LT).
+
+    Een verblijf van nul seconden raakt geen dag; eindigen om 00:00 raakt die
+    nieuwe dag niet.
+    """
     if end <= start:
-        return 0.0
-    s_day, e_day = start.date(), end.date()
-    if s_day == e_day:
-        return _office_hours_on(s_day, start, end)
-    return (_office_hours_on(s_day, start, end)
-            + count_workdays(s_day + timedelta(days=1), e_day)
-            * (OFFICE_END - OFFICE_START)
-            + _office_hours_on(e_day, start, end))
+        return set()
+    last = (end - timedelta(microseconds=1)).date()
+    days = (start.date() + timedelta(days=i) for i in range((last - start.date()).days + 1))
+    return {d for d in days if is_workday(d)}

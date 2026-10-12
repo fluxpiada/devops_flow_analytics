@@ -1,6 +1,8 @@
 from datetime import date, datetime
 
-from devops_flow import metrics
+import pytest
+
+from devops_flow import metrics, stats
 from devops_flow.cli import months_ago, project_key
 from devops_flow.excel import _csv_cell
 
@@ -131,10 +133,18 @@ def test_time_in_status_hours_and_visits():
     _, tis = metrics.items_table([REWORK], wf, NOW)
     t4 = {r["status"]: (r["visits"], r["pt_hours"], r["lt_hours"], r["sent_back"])
           for r in tis}
+    # Te doen ma 09–13: 4 h echt; LT = 1 aangeraakte werkdag = 8 h.
+    # In uitvoering ma 13 → di 13 (24 h → 8) + wo 09–13 (4) = 12; dagen ma, di, wo.
+    # Review di 13 → wo 09 (20 h → 8) + wo 13 → do 09 (8) = 16; dagen di, wo, do.
     # Review → In uitvoering is terugsturen; daarna weer naar Review is gewoon
     # vooruit — dat tweede bezoek aan Review is géén rework van Review.
-    assert t4 == {"Te doen": (1, 4.0, 4.0, 0), "In uitvoering": (2, 12.0, 28.0, 1),
-                  "Review": (2, 8.0, 40.0, 0)}
+    assert t4 == {"Te doen": (1, 4.0, 8.0, 0), "In uitvoering": (2, 12.0, 24.0, 1),
+                  "Review": (2, 16.0, 24.0, 0)}
+
+
+def test_pt_never_exceeds_lt():
+    _, tis = metrics.items_table([DONE, OPEN, SKIPPED, REWORK], metrics.Workflow(WF), NOW)
+    assert all(r["pt_hours"] <= r["lt_hours"] for r in tis)
 
 
 def test_value_stream():
@@ -143,23 +153,64 @@ def test_value_stream():
     steps, totals = metrics.value_stream(tis, wf)
     by = {s["step"]: s for s in steps}
     assert list(by) == ["Te doen", "In uitvoering", "Review"]  # Done krijgt geen blok
-    # Te doen: PT [8, 40, 8, 4] → klasse 8–16 (twee keer); LT [72, 168, 24, 4]
-    # → elke klasse één keer, gelijkspel → de kleinste: 4–8.
+    # Te doen, op volgorde van verlaten (T-1, T-4, T-3, T-2):
+    # PT [8, 4, 8, 40] → mediaan 8, mR [4, 4, 32] → 8 ± 3,145 × 4 = 0–20,6
+    # LT [16, 8, 16, 48] → mediaan 16, mR [8, 8, 32] → 16 ± 25,2 = 0–41,2
+    #   (T-2: ma 5 → ma 12 raakt zes werkdagen, beide maandagen tellen) → T-2 is hoog
     assert by["Te doen"] == {"step": "Te doen", "items": 4,
-                             "pt_mode_from_h": 8, "pt_mode_to_h": 16, "pt_median_h": 8.0,
-                             "lt_mode_from_h": 4, "lt_mode_to_h": 8, "lt_median_h": 48.0,
-                             "ca_pct": 100}
+                             "pt_median_h": 8.0, "pt_lower_h": 0.0, "pt_upper_h": 20.6,
+                             "pt_outliers": 1,
+                             "lt_median_h": 16.0, "lt_lower_h": 0.0, "lt_upper_h": 41.2,
+                             "lt_outliers": 1, "doorgeklikt": 0, "ca_pct": 100}
     # In uitvoering: T-2 staat er nog (telt niet mee), T-4 werd teruggestuurd → 50%.
-    assert by["In uitvoering"]["items"] == 2
-    assert by["In uitvoering"]["ca_pct"] == 50
-    # Review: T-4 kwam er twee keer, maar werd er nooit náártoe teruggestuurd.
-    assert by["Review"]["ca_pct"] == 100
-    # PT [16, 12]: klassen 16–32 en 8–16, gelijkspel → 8–16.
-    assert (by["In uitvoering"]["pt_mode_from_h"], by["In uitvoering"]["pt_median_h"]) == (8, 14.0)
-    assert (by["Review"]["lt_mode_from_h"], by["Review"]["lt_mode_to_h"]) == (16, 32)
-    assert by["Review"]["lt_median_h"] == 32.0
-    assert totals == {"pt_h": 30.0, "lt_h": 118.0, "activity_pct": 25,
-                      "rolled_ca_pct": 50}
+    # PT [16, 12] → 14 ± 12,6; LT [24, 24] heeft geen spreiding → geen limieten.
+    iu = by["In uitvoering"]
+    assert (iu["items"], iu["ca_pct"]) == (2, 50)
+    assert (iu["pt_median_h"], iu["pt_lower_h"], iu["pt_upper_h"]) == (14.0, 1.4, 26.6)
+    assert (iu["lt_median_h"], iu["lt_lower_h"], iu["lt_upper_h"]) == (24.0, None, None)
+    # Review: T-1 en T-4 verlieten in dezelfde minuut → één punt, geen limieten.
+    # T-4 kwam er twee keer, maar werd er nooit náártoe teruggestuurd.
+    rv = by["Review"]
+    assert (rv["pt_median_h"], rv["lt_median_h"], rv["lt_upper_h"], rv["ca_pct"]) == \
+        (12.0, 20.0, None, 100)
+    assert totals == {"pt_h": 34.0, "lt_h": 60.0, "rolled_ca_pct": 50}
+    # De rijen zelf dragen rang, z en vlag, zodat het briefje na te rekenen is.
+    t2 = next(r for r in tis if r["key"] == "T-2" and r["status"] == "Te doen")
+    assert (t2["lt_pct_rank"], t2["lt_robust_z"], t2["outlier"], t2["doorgeklikt"]) == \
+        (1.0, 5.4, "hoog", False)
+
+
+def test_median_always_within_limits():
+    wf = metrics.Workflow(WF)
+    _, tis = metrics.items_table([DONE, OPEN, SKIPPED, REWORK], wf, NOW)
+    for s in metrics.value_stream(tis, wf)[0]:
+        for k in ("pt", "lt"):
+            if s[f"{k}_upper_h"] is not None:
+                assert s[f"{k}_lower_h"] <= s[f"{k}_median_h"] <= s[f"{k}_upper_h"]
+
+
+def test_clicked_through():
+    # Te doen → In uitvoering na 10 minuten: doorgeklikt.
+    quick = issue("T-6", "2026-01-05T09:00:00.000+0100", [
+        ("2026-01-05T09:10:00.000+0100", "To Do", "In Progress"),
+        ("2026-01-07T09:00:00.000+0100", "In Progress", "Done")], "Done",
+        "2026-01-07T09:00:00.000+0100")
+    wf = metrics.Workflow(WF)
+    _, tis = metrics.items_table([quick, DONE], wf, NOW)
+    steps, _ = metrics.value_stream(tis, wf)
+    assert {s["step"]: s["doorgeklikt"] for s in steps} == {"Te doen": 1, "In uitvoering": 0,
+                                                                  "Review": 0}
+
+
+def test_flag_items():
+    wf = metrics.Workflow(WF)
+    items, _ = metrics.items_table([DONE, OPEN, SKIPPED, REWORK], wf, NOW)
+    limits = metrics.flag_items(items)
+    by = {r["key"]: r for r in items}
+    # Cycle time: T-1 3,0 en T-4 2,8, beide afgerond op do 8 jan 09:00 → één punt,
+    # dus geen spreiding en geen limieten; het centrum is de mediaan van beide.
+    assert limits["cycle_time"] == (2.9, None, None)
+    assert by["T-1"]["ct_outlier"] == "" and by["T-2"]["ct_outlier"] is None  # T-2 loopt nog
 
 
 def test_value_stream_skips_backfilled():
@@ -187,3 +238,31 @@ def test_first_visit_from_a_later_step_is_not_rework():
     ], "Done", "2026-01-05T12:00:00.000+0100")
     _, tis = metrics.items_table([skipped_dev], metrics.Workflow(WF), NOW)
     assert all(r["sent_back"] == 0 for r in tis)
+
+
+# ── robuuste statistiek ──────────────────────────────────────────────────────
+
+def test_xmr_hand_computed():
+    # mediaan 4; mR [2, 2, 6, 6] → mediaan 4 → 4 ± 12,58
+    series = list(enumerate([2, 4, 6, 0, 6]))
+    centre, lower, upper = stats.xmr(series)
+    assert (centre, lower, round(upper, 2)) == (4, 0.0, 16.58)
+
+
+def test_xmr_merges_batches_and_falls_back_to_the_mean():
+    # Drie items in één klik (t=1) zijn één punt: mR [6, 6] i.p.v. [6, 0, 0, 6].
+    centre, _, upper = stats.xmr([(0, 2), (1, 8), (1, 8), (1, 8), (2, 2)])
+    assert (centre, round(upper, 2)) == (8, 26.87)        # 8 + 3,145 × 6
+    # Mediaan mR 0, gemiddelde niet: [0, 0, 9] → 2,66 × 3
+    assert stats.xmr(list(enumerate([5, 5, 5, 14])))[2] == pytest.approx(5 + 2.66 * 3)
+    assert stats.xmr([(0, 7), (1, 7)]) == (7, None, None)  # geen spreiding
+
+
+def test_robust_z_and_percent_rank():
+    values = [1, 2, 3, 4, 100]
+    assert stats.robust_z(100, values) == pytest.approx(97 / 1.4826)  # MAD = 1
+    assert stats.robust_z(3, [3, 3, 3, 9]) is None                     # MAD = 0
+    assert stats.percent_rank(100, values) == 1.0
+    assert stats.percent_rank(1, values) == 0.0
+    assert stats.side(50, 0.0, 20) == "hoog" and stats.side(1, 2, 20) == "laag"
+    assert stats.side(1, 0.0, 20) == ""                                # ondergrens 0
