@@ -6,10 +6,12 @@ Puur rekenwerk, geen I/O. Duren per item in werkdagen (zie workdays.py):
 - lead time  = aangemaakt → Done
 - age        = eerste In Progress → nu, voor werk dat nu In Progress staat
 
-De waardestroom rekent per stap (status) in uren:
+De waardestroom rekent per stap (status) in werkuren — 1 werkdag = 8 uur:
 
-- PT    = uren binnen kantooruren in de status (proxy, geen gemeten inspanning)
-- LT    = kloktijd in de status
+- PT    = tijd in de stap; korte verblijven echt, langere per werkdag 8 uur
+          (`work_hours`; proxy, geen gemeten inspanning)
+- LT    = elke werkdag waarop het item in de stap stond, helemaal (× 8 uur)
+- bereik en uitschieters: XmR-limieten (zie stats.py)
 - %C&A  = aandeel items dat de stap verliet en er nooit naar werd teruggestuurd
 """
 
@@ -21,13 +23,24 @@ from bisect import bisect_right
 from collections import Counter
 from datetime import date, datetime, timedelta
 
-from .workdays import is_workday, office_hours_between, workdays_between
+from .stats import Limits, percent_rank, robust_z, side, xmr
+from .workdays import (
+    WORKDAY_H,
+    is_workday,
+    work_hours,
+    workdays_between,
+    workdays_touched,
+)
 
 CATEGORIES = ("To Do", "In Progress", "Done")
 
 # ≈1 uur: een issue waarvan álle statusovergangen binnen dit venster vallen is
 # achteraf bijgewerkt — de tijdstempels beschrijven de administratie, niet het werk.
 BACKFILL_THRESHOLD_D = 0.04
+
+# Minder dan een werkuur in een stap: overgeslagen of administratief doorgezet.
+# Een vaste regel, geen statistiek — de XmR-ondergrens is bij scheve tijden 0.
+CLICKED_THROUGH_H = 1.0
 
 
 def parse_dt(value: str) -> datetime:
@@ -167,12 +180,13 @@ def item_row(issue: dict, wf: Workflow, now: datetime) -> tuple[dict, list[dict]
     current = f["status"]["id"]
     per_status: dict[str, dict] = {}
     for sid, a, b in spans(issue, trans, stop):
-        st = per_status.setdefault(sid, {"workdays": 0.0, "visits": 0,
-                                         "pt_hours": 0.0, "lt_hours": 0.0})
+        st = per_status.setdefault(sid, {"workdays": 0.0, "visits": 0, "pt_hours": 0.0,
+                                         "days": set(), "left_at": None})
         st["workdays"] += workdays_between(a, b)
         st["visits"] += 1
-        st["pt_hours"] += office_hours_between(a, b)
-        st["lt_hours"] += (b - a).total_seconds() / 3600
+        st["pt_hours"] += work_hours(a, b)
+        st["days"] |= workdays_touched(a, b)  # verzameling: twee bezoeken op één dag tellen één keer
+        st["left_at"] = b
     sent_back = _sent_back(trans, trans[0][1] if trans else current, wf, stop)
 
     def wd(a, b):
@@ -197,13 +211,20 @@ def item_row(issue: dict, wf: Workflow, now: datetime) -> tuple[dict, list[dict]
         "backfilled": len(trans) >= 2 and (trans[-1][0] - trans[0][0])
         .total_seconds() / 86400 < BACKFILL_THRESHOLD_D,
     }
-    tis = [{"key": issue["key"], "status": wf.name(sid), "category": wf.category(sid),
+    tis = []
+    for sid, st in per_status.items():
+        lt = len(st["days"]) * WORKDAY_H
+        here = sid == current and done is None  # nú nog hier: het laatste bezoek is niet af
+        tis.append({
+            "key": issue["key"], "status": wf.name(sid), "category": wf.category(sid),
             "workdays": round(st["workdays"], 2), "visits": st["visits"],
-            "pt_hours": round(st["pt_hours"], 1), "lt_hours": round(st["lt_hours"], 1),
-            "sent_back": sent_back[sid],
-            # Staat het item hier nú nog? Dan is het laatste bezoek niet af.
-            "current": sid == current and done is None}
-           for sid, st in per_status.items()]
+            # PT ≤ LT: twee korte bezoeken op één dag tellen samen nooit meer dan die dag.
+            "pt_hours": round(min(st["pt_hours"], lt), 1), "lt_hours": float(lt),
+            "sent_back": sent_back[sid], "current": here,
+            "left_at": None if here else st["left_at"],
+            # door value_stream ingevuld, per stap:
+            "lt_pct_rank": None, "lt_robust_z": None, "outlier": None, "doorgeklikt": None,
+        })
     return row, tis
 
 
@@ -219,30 +240,43 @@ def items_table(issues: list[dict], wf: Workflow,
 
 # ── waardestroom ─────────────────────────────────────────────────────────────
 
-def _modal_class(values: list[float]) -> tuple[float, float] | tuple[None, None]:
-    """De meest voorkomende klasse (van, tot) in uren; bij gelijkspel de kleinste.
+def _minute(ts: datetime) -> datetime:
+    """Batches (in één klik verschoven) delen hun minuut — zie stats.xmr."""
+    return ts.replace(second=0, microsecond=0)
 
-    Verdubbelende klassen (<1, 1–2, 2–4, … 512–1024 h): tijden zijn continu én
-    scheef verdeeld. Met vaste klassen van een halve dag viel de modus op MOD
-    in "0 h" met 7 van de 51 items — een klasse die niets typeert.
-    """
-    if not values:
-        return None, None
-    classes = Counter(0 if v < 1 else 2 ** math.floor(math.log2(v)) for v in values)
-    top = max(classes.values())
-    lo = min(c for c, n in classes.items() if n == top)
-    return lo, (1 if lo == 0 else 2 * lo)
+
+def _limits(rows: list[dict], field: str, when: str) -> Limits | None:
+    return xmr((_minute(r[when]), r[field]) for r in rows)
+
+
+def _flag(rows: list[dict], field: str, when: str, prefix: str,
+          outlier_field: str) -> Limits | None:
+    """XmR over `rows` (in volgorde van `when`); zet per rij rang, z en hoog/laag."""
+    lim = _limits(rows, field, when)
+    if lim is None:
+        return None
+    values = [r[field] for r in rows]
+    for r in rows:
+        r[f"{prefix}_pct_rank"] = round(percent_rank(r[field], values), 2)
+        z = robust_z(r[field], values)
+        r[f"{prefix}_robust_z"] = None if z is None else round(z, 1)
+        r[outlier_field] = side(r[field], lim[1], lim[2])
+    return lim
 
 
 def value_stream(tis: list[dict], wf: Workflow,
                  skip: set[str] = frozenset()) -> tuple[list[dict], dict]:
-    """(stappen, totalen) — een pure aggregatie van de time-in-status-rijen.
+    """(stappen, totalen) uit de time-in-status-rijen.
 
     Een stap is elke To Do- of In Progress-status; Done is het eind van de
     stroom en krijgt geen blok.
-    - PT/LT: over items die de stap verlieten (een lopend bezoek is niet af).
+    - PT/LT: mediaan en XmR-limieten over items die de stap verlieten (een
+      lopend bezoek is niet af), op volgorde van verlaten.
+    - uitschieters: LT boven de bovengrens; doorgeklikt: PT onder een werkuur.
     - %C&A: van de items die de stap verlieten, het deel dat er nooit vanuit
       een latere stap naar werd teruggestuurd (zie `_sent_back`).
+    Vult per rij ook `lt_pct_rank`, `lt_robust_z`, `outlier` en `doorgeklikt`,
+    zodat elk getal op het briefje naar de rijen te herleiden is.
     `skip`: sleutels die niet meetellen (backfilled items, net als bij de percentielen).
     """
     names = [n for n, _ in wf.statuses.values()]
@@ -259,29 +293,55 @@ def value_stream(tis: list[dict], wf: Workflow,
         ca_pop = [r for r in rows if not r["current"] or r["visits"] > 1]
         if not ca_pop:
             continue  # niemand heeft deze stap ooit verlaten
-        pt = [r["pt_hours"] for r in left]
-        lt = [r["lt_hours"] for r in left]
-        (pt_lo, pt_hi), (lt_lo, lt_hi) = _modal_class(pt), _modal_class(lt)
+        pt = _limits(left, "pt_hours", "left_at")
+        lt = _flag(left, "lt_hours", "left_at", "lt", "outlier")
+        for r in left:
+            r["doorgeklikt"] = r["pt_hours"] < CLICKED_THROUGH_H
+
+        def triple(lim, kind):
+            c, lo, hi = lim or (None, None, None)
+            return {f"{kind}_median_h": _r1(c), f"{kind}_lower_h": _r1(lo),
+                    f"{kind}_upper_h": _r1(hi)}
+
         steps.append({
             "step": name,
             "items": len(ca_pop),
-            "pt_mode_from_h": pt_lo, "pt_mode_to_h": pt_hi,
-            "pt_median_h": round(statistics.median(pt), 1) if pt else None,
-            "lt_mode_from_h": lt_lo, "lt_mode_to_h": lt_hi,
-            "lt_median_h": round(statistics.median(lt), 1) if lt else None,
+            **triple(pt, "pt"),
+            "pt_outliers": sum(side(r["pt_hours"], *pt[1:]) == "hoog" for r in left) if pt else 0,
+            **triple(lt, "lt"),
+            "lt_outliers": sum(r["outlier"] == "hoog" for r in left),
+            "doorgeklikt": sum(r["doorgeklikt"] for r in left),
             "ca_pct": round(100 * sum(1 for r in ca_pop if not r["sent_back"])
                             / len(ca_pop)),
         })
 
-    pt_total = sum(s["pt_median_h"] or 0 for s in steps)
-    lt_total = sum(s["lt_median_h"] or 0 for s in steps)
     rolled = 1.0
     for s in steps:
         rolled *= s["ca_pct"] / 100
-    totals = {"pt_h": round(pt_total, 1), "lt_h": round(lt_total, 1),
-              "activity_pct": round(100 * pt_total / lt_total) if lt_total else None,
+    totals = {"pt_h": _r1(sum(s["pt_median_h"] or 0 for s in steps)),
+              "lt_h": _r1(sum(s["lt_median_h"] or 0 for s in steps)),
               "rolled_ca_pct": round(100 * rolled) if steps else None}
     return steps, totals
+
+
+def _r1(v: float | None) -> float | None:
+    return None if v is None else round(v, 1)
+
+
+def flag_items(items: list[dict], skip: set[str] = frozenset()) -> dict[str, tuple]:
+    """Uitschieters in cycle time en lead time, over afgeronde items op volgorde
+    van afronden. Zet per item rang, robuuste z en hoog/laag; geeft per maat
+    (centrum, ondergrens, bovengrens) terug voor de lijnen in het dashboard.
+    """
+    out = {}
+    for field, prefix in (("cycle_time", "ct"), ("lead_time", "lt")):
+        for r in items:
+            r[f"{prefix}_pct_rank"] = r[f"{prefix}_robust_z"] = r[f"{prefix}_outlier"] = None
+        rows = [r for r in items if r[field] is not None and r["key"] not in skip]
+        lim = _flag(rows, field, "done", prefix, f"{prefix}_outlier")
+        if lim:
+            out[field] = lim
+    return out
 
 
 # ── per dag (CFD) ────────────────────────────────────────────────────────────
